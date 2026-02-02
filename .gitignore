@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+ENV/
+*.egg-info/
+.eggs/
+
+# Environment
+.env
+*.local
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+geo_sensor.db
+
+# Logs
+*.log
+logs/
+server.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Test
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OMC state
+.omc/state/
+.omc/logs/
+
+# OS
+.DS_Store
+Thumbs.db
+nul
