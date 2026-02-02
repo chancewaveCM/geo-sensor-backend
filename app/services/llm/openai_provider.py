@@ -66,12 +66,14 @@ class OpenAIService(BaseLLMService):
     async def analyze_sentiment(self, text: str, brand_context: Optional[str] = None) -> dict:
         """Analyze sentiment using OpenAI"""
         system = "You are a sentiment analysis expert. Respond only in valid JSON."
-        prompt = f'''Analyze the sentiment of the following text{f" regarding {brand_context}" if brand_context else ""}.
+        context_part = f" regarding {brand_context}" if brand_context else ""
+        prompt = f'''Analyze the sentiment of the following text{context_part}.
 
 Text: {text}
 
 Respond in JSON format:
-{{"sentiment": "positive|neutral|negative", "confidence": 0.0-1.0, "reasoning": "brief explanation"}}'''
+{{"sentiment": "positive|neutral|negative", "confidence": 0.0-1.0,
+"reasoning": "brief explanation"}}'''
 
         response = await self.generate(prompt, system_prompt=system, temperature=0.3)
 
@@ -79,7 +81,11 @@ Respond in JSON format:
         try:
             return json.loads(response.content)
         except json.JSONDecodeError:
-            return {"sentiment": "neutral", "confidence": 0.5, "reasoning": "Failed to parse response"}
+            return {
+                "sentiment": "neutral",
+                "confidence": 0.5,
+                "reasoning": "Failed to parse response",
+            }
 
     async def classify_context(self, text: str, brand: str) -> dict:
         """Classify context type for brand mention"""

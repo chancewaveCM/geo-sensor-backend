@@ -20,5 +20,9 @@ class Project(Base, TimestampMixin):
 
     # Relationships
     owner: Mapped["User"] = relationship("User", back_populates="projects")
-    brands: Mapped[list["Brand"]] = relationship("Brand", back_populates="project", cascade="all, delete-orphan")
-    queries: Mapped[list["Query"]] = relationship("Query", back_populates="project", cascade="all, delete-orphan")
+    brands: Mapped[list["Brand"]] = relationship(
+        "Brand", back_populates="project", cascade="all, delete-orphan"
+    )
+    queries: Mapped[list["Query"]] = relationship(
+        "Query", back_populates="project", cascade="all, delete-orphan"
+    )

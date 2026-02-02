@@ -3,10 +3,9 @@ Sentiment Analyzer
 F6: Gemini-based sentiment analysis with rule-based fallback
 """
 
-import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..llm.base import BaseLLMService
@@ -179,7 +178,9 @@ class SentimentAnalyzer:
         return SentimentResult(
             sentiment=sentiment,
             confidence=confidence,
-            reasoning=f"Rule-based: {positive_count} positive, {negative_count} negative indicators",
+            reasoning=(
+                f"Rule-based: {positive_count} positive, {negative_count} negative indicators"
+            ),
         )
 
     def analyze_sync(

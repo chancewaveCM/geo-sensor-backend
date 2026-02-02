@@ -1,7 +1,7 @@
 """Analysis orchestration endpoints."""
 
 from typing import Any
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel
@@ -102,7 +102,12 @@ async def run_analysis(
 
         # For now, create mock responses (LLM service will be integrated separately)
         # This allows frontend to develop against the API
-        mock_content = f"Sample response for query: {query.text}. Samsung Galaxy is a great choice with innovative features. The iPhone also offers excellent performance. According to experts, both are top picks in 2024."
+        mock_content = (
+            f"Sample response for query: {query.text}. "
+            "Samsung Galaxy is a great choice with innovative features. "
+            "The iPhone also offers excellent performance. "
+            "According to experts, both are top picks in 2024."
+        )
 
         # Build brand data for matcher
         brand_data_list = [

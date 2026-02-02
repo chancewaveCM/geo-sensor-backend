@@ -26,7 +26,10 @@ class GeminiService(BaseLLMService):
                 genai.configure(api_key=self.api_key)
                 self._client = genai.GenerativeModel(self.model)
             except ImportError:
-                raise ImportError("google-generativeai package required. Install with: pip install google-generativeai")
+                raise ImportError(
+                    "google-generativeai package required. "
+                    "Install with: pip install google-generativeai"
+                )
         return self._client
 
     async def generate(
@@ -59,19 +62,27 @@ class GeminiService(BaseLLMService):
             content=response.text,
             provider=self.provider,
             model=self.model,
-            tokens_used=response.usage_metadata.total_token_count if hasattr(response, 'usage_metadata') else 0,
+            tokens_used=(
+                response.usage_metadata.total_token_count
+                if hasattr(response, 'usage_metadata') else 0
+            ),
             latency_ms=latency_ms,
-            raw_response={"candidates": [c.text for c in response.candidates]} if response.candidates else None,
+            raw_response=(
+                {"candidates": [c.text for c in response.candidates]}
+                if response.candidates else None
+            ),
         )
 
     async def analyze_sentiment(self, text: str, brand_context: Optional[str] = None) -> dict:
         """Analyze sentiment using Gemini"""
-        prompt = f'''Analyze the sentiment of the following text{f" regarding {brand_context}" if brand_context else ""}.
+        context_part = f" regarding {brand_context}" if brand_context else ""
+        prompt = f'''Analyze the sentiment of the following text{context_part}.
 
 Text: {text}
 
 Respond in JSON format:
-{{"sentiment": "positive|neutral|negative", "confidence": 0.0-1.0, "reasoning": "brief explanation"}}'''
+{{"sentiment": "positive|neutral|negative", "confidence": 0.0-1.0,
+"reasoning": "brief explanation"}}'''
 
         response = await self.generate(prompt, temperature=0.3)
 
@@ -79,7 +90,11 @@ Respond in JSON format:
         try:
             return json.loads(response.content)
         except json.JSONDecodeError:
-            return {"sentiment": "neutral", "confidence": 0.5, "reasoning": "Failed to parse response"}
+            return {
+                "sentiment": "neutral",
+                "confidence": 0.5,
+                "reasoning": "Failed to parse response",
+            }
 
     async def classify_context(self, text: str, brand: str) -> dict:
         """Classify context type for brand mention"""

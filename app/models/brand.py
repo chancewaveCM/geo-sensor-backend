@@ -14,7 +14,8 @@ class Brand(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
-    aliases: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)  # ["삼성전자", "Samsung Electronics"]
+    # ["삼성전자", "Samsung Electronics"]
+    aliases: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
     keywords: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)  # ["갤럭시", "Galaxy"]
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)

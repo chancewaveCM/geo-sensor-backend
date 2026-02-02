@@ -54,7 +54,9 @@ class EvaluationResult:
         return {
             "overall_metrics": self.overall_metrics.to_dict(),
             "per_brand_metrics": {k: v.to_dict() for k, v in self.per_brand_metrics.items()},
-            "per_match_type_metrics": {k: v.to_dict() for k, v in self.per_match_type_metrics.items()},
+            "per_match_type_metrics": {
+                k: v.to_dict() for k, v in self.per_match_type_metrics.items()
+            },
             "target_f1": self.target_f1,
             "passed": self.passed,
         }

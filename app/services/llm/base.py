@@ -55,7 +55,8 @@ class BaseLLMService(ABC):
     async def classify_context(self, text: str, brand: str) -> dict:
         """
         Classify the context type of a brand mention
-        Returns: {"context_type": "recommendation|comparison|mention|negative", "confidence": 0.0-1.0}
+        Returns:
+            {"context_type": "recommendation|comparison|mention|negative", "confidence": 0.0-1.0}
         """
         pass
 

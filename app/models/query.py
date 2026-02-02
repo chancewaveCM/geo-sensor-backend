@@ -1,4 +1,4 @@
-from sqlalchemy import String, ForeignKey, Text, Enum
+from sqlalchemy import ForeignKey, Text, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from typing import TYPE_CHECKING
@@ -29,4 +29,6 @@ class Query(Base, TimestampMixin):
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="queries")
-    responses: Mapped[list["Response"]] = relationship("Response", back_populates="query", cascade="all, delete-orphan")
+    responses: Mapped[list["Response"]] = relationship(
+        "Response", back_populates="query", cascade="all, delete-orphan"
+    )

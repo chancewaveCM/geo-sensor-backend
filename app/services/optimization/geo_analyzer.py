@@ -151,7 +151,9 @@ class GEOOptimizationAnalyzer:
 
     def __init__(self):
         # Compile patterns
-        self._definition_re = [re.compile(p, re.IGNORECASE | re.MULTILINE) for p in self.DEFINITION_PATTERNS]
+        self._definition_re = [
+            re.compile(p, re.IGNORECASE | re.MULTILINE) for p in self.DEFINITION_PATTERNS
+        ]
         self._structure_re = [re.compile(p, re.MULTILINE) for p in self.STRUCTURE_PATTERNS]
         self._statistics_re = [re.compile(p, re.IGNORECASE) for p in self.STATISTICS_PATTERNS]
         self._authority_re = [re.compile(p, re.IGNORECASE) for p in self.AUTHORITY_PATTERNS]
@@ -213,7 +215,10 @@ class GEOOptimizationAnalyzer:
             trigger_type=TriggerType.CLEAR_DEFINITION,
             detected=match_count > 0,
             score=score,
-            evidence=f"{len(matches)} definition patterns found" + (", brand defined" if brand_defined else ""),
+            evidence=(
+                f"{len(matches)} definition patterns found"
+                + (", brand defined" if brand_defined else "")
+            ),
         )
 
     def _detect_structured_info(self, content: str) -> TriggerResult:
@@ -299,10 +304,16 @@ class GEOOptimizationAnalyzer:
 
         suggestion_map = {
             TriggerType.CLEAR_DEFINITION: "Add clear definitions - use 'X is a...' format",
-            TriggerType.STRUCTURED_INFO: "Add structured content - use bullet points, numbered lists, or tables",
+            TriggerType.STRUCTURED_INFO: (
+                "Add structured content - use bullet points, numbered lists, or tables"
+            ),
             TriggerType.STATISTICS: "Include statistics - add percentages, numbers, or rankings",
-            TriggerType.AUTHORITY: "Add authority signals - include quotes, expert opinions, or research citations",
-            TriggerType.SUMMARY: "Add a summary section - include 'In summary' or 'To conclude' phrases",
+            TriggerType.AUTHORITY: (
+                "Add authority signals - include quotes, expert opinions, or research citations"
+            ),
+            TriggerType.SUMMARY: (
+                "Add a summary section - include 'In summary' or 'To conclude' phrases"
+            ),
         }
 
         for trigger in triggers:

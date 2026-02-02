@@ -46,7 +46,10 @@ async def create_query(
     """Create new query."""
     # Verify project access
     result = await db.execute(
-        select(Project).where(Project.id == query_in.project_id, Project.owner_id == current_user.id)
+        select(Project).where(
+            Project.id == query_in.project_id,
+            Project.owner_id == current_user.id
+        )
     )
     if result.scalar_one_or_none() is None:
         raise HTTPException(status_code=404, detail="Project not found")

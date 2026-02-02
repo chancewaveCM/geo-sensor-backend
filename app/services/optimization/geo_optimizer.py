@@ -153,11 +153,14 @@ class GEOOptimizer:
         avg_sentiment = 0.0
 
         if sentiments:
-            brand_sentiments = [s for s in sentiments if hasattr(s, 'brand_id') and s.brand_id == brand_id]
+            brand_sentiments = [
+                s for s in sentiments if hasattr(s, 'brand_id') and s.brand_id == brand_id
+            ]
             for sent in brand_sentiments:
                 sentiment_dist[sent.sentiment.value] += 1
                 # Convert sentiment to numeric: positive=1, neutral=0, negative=-1
-                sentiment_val = {"positive": 1.0, "neutral": 0.0, "negative": -1.0}[sent.sentiment.value]
+                sentiment_map = {"positive": 1.0, "neutral": 0.0, "negative": -1.0}
+                sentiment_val = sentiment_map[sent.sentiment.value]
                 avg_sentiment += sentiment_val
             if brand_sentiments:
                 avg_sentiment /= len(brand_sentiments)
@@ -237,7 +240,9 @@ class GEOOptimizer:
                 type=OptimizationType.CONTENT,
                 priority=OptimizationPriority.CRITICAL,
                 title="Create Authoritative Content",
-                description="Publish high-quality, structured content that AI models can reference.",
+                description=(
+                    "Publish high-quality, structured content that AI models can reference."
+                ),
                 expected_impact="citation_share +5-10%",
                 effort="high",
             ),
@@ -246,7 +251,10 @@ class GEOOptimizer:
         return GEOAnalysis(
             brand_performance=performance,
             optimization_actions=actions,
-            competitive_insights={"total_competitors": total_mentions, "market_dominated_by_others": True},
+            competitive_insights={
+                "total_competitors": total_mentions,
+                "market_dominated_by_others": True,
+            },
             overall_score=0.0,
             query_id=query_id,
         )
@@ -268,7 +276,9 @@ class GEOOptimizer:
                 type=OptimizationType.VISIBILITY,
                 priority=priority,
                 title="Increase Brand Mentions",
-                description=f"Current citation share: {performance.citation_share:.1f}%. Target: 50%+",
+                description=(
+                    f"Current citation share: {performance.citation_share:.1f}%. Target: 50%+"
+                ),
                 expected_impact=f"citation_share +{max(5, 50 - performance.citation_share):.0f}%",
                 effort="medium" if performance.citation_share > 20 else "high",
                 metrics={"current_share": performance.citation_share, "target_share": 50.0},
@@ -276,11 +286,18 @@ class GEOOptimizer:
 
         # 2. Sentiment optimization
         if performance.avg_sentiment < 0.3:
+            priority = (
+                OptimizationPriority.HIGH if performance.avg_sentiment < 0
+                else OptimizationPriority.MEDIUM
+            )
             actions.append(OptimizationAction(
                 type=OptimizationType.SENTIMENT,
-                priority=OptimizationPriority.HIGH if performance.avg_sentiment < 0 else OptimizationPriority.MEDIUM,
+                priority=priority,
                 title="Improve Brand Sentiment",
-                description=f"Average sentiment score: {performance.avg_sentiment:.2f}. Address negative mentions.",
+                description=(
+                    f"Average sentiment score: {performance.avg_sentiment:.2f}. "
+                    "Address negative mentions."
+                ),
                 expected_impact="sentiment +0.2-0.5",
                 effort="medium",
                 metrics={"current_sentiment": performance.avg_sentiment, "target_sentiment": 0.5},
@@ -292,21 +309,32 @@ class GEOOptimizer:
                 type=OptimizationType.CONTEXT,
                 priority=OptimizationPriority.MEDIUM,
                 title="Target Recommendation Contexts",
-                description="Brand not appearing in recommendation contexts. Focus on 'best for' scenarios.",
+                description=(
+                    "Brand not appearing in recommendation contexts. "
+                    "Focus on 'best for' scenarios."
+                ),
                 expected_impact="recommendation_contexts +20-30%",
                 effort="medium",
                 metrics={"recommendation_context_share": 0.0},
             ))
 
         # 4. Competitive positioning
-        top_competitor_share = citation_result.shares[0].share_percentage if citation_result.shares else 0
+        top_competitor_share = (
+            citation_result.shares[0].share_percentage if citation_result.shares else 0
+        )
         if top_competitor_share - performance.citation_share > 20:
             actions.append(OptimizationAction(
                 type=OptimizationType.COMPETITIVE,
                 priority=OptimizationPriority.HIGH,
                 title="Counter Top Competitor",
-                description=f"Top competitor has {top_competitor_share - performance.citation_share:.1f}% higher share.",
-                expected_impact=f"citation_share +{(top_competitor_share - performance.citation_share) / 2:.0f}%",
+                description=(
+                    f"Top competitor has "
+                    f"{top_competitor_share - performance.citation_share:.1f}% higher share."
+                ),
+                expected_impact=(
+                    f"citation_share +"
+                    f"{(top_competitor_share - performance.citation_share) / 2:.0f}%"
+                ),
                 effort="high",
                 metrics={"gap": top_competitor_share - performance.citation_share},
             ))
@@ -342,7 +370,10 @@ class GEOOptimizer:
             "total_competitors": len(competitors),
             "top_competitor": competitors[0].brand_name if competitors else None,
             "top_competitor_share": competitors[0].share_percentage if competitors else 0.0,
-            "share_gap": (competitors[0].share_percentage - brand_share.share_percentage) if competitors else 0.0,
+            "share_gap": (
+                (competitors[0].share_percentage - brand_share.share_percentage)
+                if competitors else 0.0
+            ),
             "market_leader": rank == 1,
         }
 
