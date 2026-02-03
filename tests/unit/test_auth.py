@@ -1,24 +1,24 @@
 import pytest
-from httpx import AsyncClient, ASGITransport
+from httpx import ASGITransport, AsyncClient
 
+from app.core.security import create_access_token, get_password_hash, verify_password, verify_token
 from app.main import app
-from app.core.security import get_password_hash, verify_password, create_access_token, verify_token
 
 
 class TestPasswordHashing:
     def test_hash_password(self):
-        password = "testpassword123"
+        password = "TestPassword123!"
         hashed = get_password_hash(password)
         assert hashed != password
         assert len(hashed) > 0
 
     def test_verify_correct_password(self):
-        password = "testpassword123"
+        password = "TestPassword123!"
         hashed = get_password_hash(password)
         assert verify_password(password, hashed) is True
 
     def test_verify_wrong_password(self):
-        password = "testpassword123"
+        password = "TestPassword123!"
         hashed = get_password_hash(password)
         assert verify_password("wrongpassword", hashed) is False
 
@@ -49,7 +49,7 @@ class TestAuthEndpoints:
                 "/api/v1/auth/register",
                 json={
                     "email": "test@example.com",
-                    "password": "testpassword123",
+                    "password": "TestPassword123",
                     "full_name": "Test User"
                 }
             )
