@@ -2,10 +2,20 @@
 OpenAI LLM Provider Implementation
 """
 
+import logging
 import time
-from typing import Optional
 
 from .base import BaseLLMService, LLMProvider, LLMResponse
+from .constants import CLASSIFICATION_TEMPERATURE, DEFAULT_MAX_TOKENS, HEALTH_CHECK_MAX_TOKENS
+from .prompts import (
+    CONTEXT_CLASSIFICATION_PROMPT,
+    CONTEXT_SYSTEM_PROMPT,
+    SENTIMENT_ANALYSIS_PROMPT,
+    SENTIMENT_SYSTEM_PROMPT,
+)
+from .utils import parse_llm_json_response
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAIService(BaseLLMService):
@@ -31,9 +41,9 @@ class OpenAIService(BaseLLMService):
     async def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
-        max_tokens: int = 1024,
+        max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> LLMResponse:
         """Generate response using OpenAI"""
         start_time = time.time()
@@ -63,58 +73,46 @@ class OpenAIService(BaseLLMService):
             raw_response=response.model_dump() if hasattr(response, 'model_dump') else None,
         )
 
-    async def analyze_sentiment(self, text: str, brand_context: Optional[str] = None) -> dict:
+    async def analyze_sentiment(self, text: str, brand_context: str | None = None) -> dict:
         """Analyze sentiment using OpenAI"""
-        system = "You are a sentiment analysis expert. Respond only in valid JSON."
         context_part = f" regarding {brand_context}" if brand_context else ""
-        prompt = f'''Analyze the sentiment of the following text{context_part}.
+        prompt = SENTIMENT_ANALYSIS_PROMPT.format(context_part=context_part, text=text)
 
-Text: {text}
+        response = await self.generate(
+            prompt,
+            system_prompt=SENTIMENT_SYSTEM_PROMPT,
+            temperature=CLASSIFICATION_TEMPERATURE,
+        )
 
-Respond in JSON format:
-{{"sentiment": "positive|neutral|negative", "confidence": 0.0-1.0,
-"reasoning": "brief explanation"}}'''
-
-        response = await self.generate(prompt, system_prompt=system, temperature=0.3)
-
-        import json
-        try:
-            return json.loads(response.content)
-        except json.JSONDecodeError:
-            return {
-                "sentiment": "neutral",
-                "confidence": 0.5,
-                "reasoning": "Failed to parse response",
-            }
+        return parse_llm_json_response(
+            content=response.content,
+            required_keys=["sentiment", "confidence"],
+            fallback={"sentiment": "neutral", "confidence": 0.5, "reasoning": "Parse error"},
+            logger=logger,
+        )
 
     async def classify_context(self, text: str, brand: str) -> dict:
         """Classify context type for brand mention"""
-        system = "You are a context classification expert. Respond only in valid JSON."
-        prompt = f'''Classify the context type of how "{brand}" is mentioned in the following text.
+        prompt = CONTEXT_CLASSIFICATION_PROMPT.format(brand=brand, text=text)
 
-Text: {text}
+        response = await self.generate(
+            prompt,
+            system_prompt=CONTEXT_SYSTEM_PROMPT,
+            temperature=CLASSIFICATION_TEMPERATURE,
+        )
 
-Context types:
-- recommendation: The brand is being recommended or endorsed
-- comparison: The brand is being compared with competitors
-- mention: Neutral mention of the brand
-- negative: Negative context or criticism
-
-Respond in JSON format:
-{{"context_type": "recommendation|comparison|mention|negative", "confidence": 0.0-1.0}}'''
-
-        response = await self.generate(prompt, system_prompt=system, temperature=0.3)
-
-        import json
-        try:
-            return json.loads(response.content)
-        except json.JSONDecodeError:
-            return {"context_type": "mention", "confidence": 0.5}
+        return parse_llm_json_response(
+            content=response.content,
+            required_keys=["context_type"],
+            fallback={"context_type": "mention", "confidence": 0.5},
+            logger=logger,
+        )
 
     async def health_check(self) -> bool:
         """Check OpenAI API availability"""
         try:
-            response = await self.generate("Hello", max_tokens=10)
+            response = await self.generate("Hello", max_tokens=HEALTH_CHECK_MAX_TOKENS)
             return len(response.content) > 0
-        except Exception:
+        except Exception as e:
+            logger.warning(f"OpenAI health check failed: {e}")
             return False

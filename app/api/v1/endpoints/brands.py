@@ -3,10 +3,10 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import DbSession, CurrentUser
+from app.api.deps import CurrentUser, DbSession
 from app.models.brand import Brand
 from app.models.project import Project
-from app.schemas.brand import BrandCreate, BrandUpdate, BrandResponse
+from app.schemas.brand import BrandCreate, BrandResponse, BrandUpdate
 
 router = APIRouter(prefix="/brands", tags=["brands"])
 

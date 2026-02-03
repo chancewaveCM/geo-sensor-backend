@@ -9,8 +9,7 @@ import sys
 import uuid
 from contextvars import ContextVar
 from datetime import datetime
-from typing import Any, Dict, Optional
-
+from typing import Any
 
 # Correlation ID for request tracing
 correlation_id_var: ContextVar[str] = ContextVar('correlation_id', default='')
@@ -20,7 +19,7 @@ class JSONFormatter(logging.Formatter):
     """JSON formatter for structured logging"""
 
     def format(self, record: logging.LogRecord) -> str:
-        log_data: Dict[str, Any] = {
+        log_data: dict[str, Any] = {
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'level': record.levelname,
             'logger': record.name,
@@ -68,7 +67,7 @@ class StandardFormatter(logging.Formatter):
 def setup_logging(
     log_level: str = "INFO",
     json_format: bool = True,
-    log_file: Optional[str] = None,
+    log_file: str | None = None,
 ) -> None:
     """
     Configure application logging
@@ -122,7 +121,7 @@ def generate_correlation_id() -> str:
     return str(uuid.uuid4())[:8]
 
 
-def set_correlation_id(cid: Optional[str] = None) -> str:
+def set_correlation_id(cid: str | None = None) -> str:
     """
     Set correlation ID for current context
 
@@ -145,7 +144,7 @@ def get_correlation_id() -> str:
 class LoggerAdapter(logging.LoggerAdapter):
     """Logger adapter that automatically includes extra data"""
 
-    def process(self, msg: str, kwargs: Dict) -> tuple:
+    def process(self, msg: str, kwargs: dict) -> tuple:
         extra = kwargs.get('extra', {})
         extra['extra_data'] = self.extra
         kwargs['extra'] = extra

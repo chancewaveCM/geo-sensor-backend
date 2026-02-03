@@ -2,7 +2,6 @@
 LLM Service Factory
 """
 
-from typing import Optional
 
 from .base import BaseLLMService, LLMProvider
 from .gemini import GeminiService
@@ -19,7 +18,7 @@ class LLMFactory:
         cls,
         provider: LLMProvider,
         api_key: str,
-        model: Optional[str] = None,
+        model: str | None = None,
         cache: bool = True,
     ) -> BaseLLMService:
         """

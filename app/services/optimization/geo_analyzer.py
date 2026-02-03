@@ -6,7 +6,6 @@ F9: 5-trigger scoring system for content optimization
 import re
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional
 
 
 class TriggerType(Enum):
@@ -33,7 +32,7 @@ class TriggerResult:
     trigger_type: TriggerType
     detected: bool
     score: float  # 0-20 per trigger
-    evidence: Optional[str] = None
+    evidence: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -49,8 +48,8 @@ class GEOScore:
     """Complete GEO optimization score"""
     total_score: float  # 0-100
     grade: Grade
-    triggers: List[TriggerResult] = field(default_factory=list)
-    suggestions: List[str] = field(default_factory=list)
+    triggers: list[TriggerResult] = field(default_factory=list)
+    suggestions: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
@@ -162,7 +161,7 @@ class GEOOptimizationAnalyzer:
     def analyze(
         self,
         content: str,
-        brand: Optional[str] = None,
+        brand: str | None = None,
     ) -> GEOScore:
         """
         Analyze content for GEO optimization triggers
@@ -193,7 +192,7 @@ class GEOOptimizationAnalyzer:
             suggestions=suggestions,
         )
 
-    def _detect_clear_definition(self, content: str, brand: Optional[str]) -> TriggerResult:
+    def _detect_clear_definition(self, content: str, brand: str | None) -> TriggerResult:
         """Detect clear definition triggers"""
         matches = []
         for pattern in self._definition_re:
@@ -298,7 +297,7 @@ class GEOOptimizationAnalyzer:
         else:
             return Grade.F
 
-    def _generate_suggestions(self, triggers: List[TriggerResult]) -> List[str]:
+    def _generate_suggestions(self, triggers: list[TriggerResult]) -> list[str]:
         """Generate improvement suggestions"""
         suggestions = []
 

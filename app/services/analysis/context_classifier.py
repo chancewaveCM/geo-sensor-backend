@@ -3,10 +3,9 @@ Context Classifier
 F7: Classify AI response context (informational, comparative, recommendation)
 """
 
+import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, List
-import re
 
 
 class ContextType(Enum):
@@ -24,9 +23,9 @@ class ContextClassification:
     """Classification result for AI response"""
     primary_context: ContextType
     confidence: float  # 0.0 - 1.0
-    secondary_contexts: List[ContextType]
+    secondary_contexts: list[ContextType]
     reasoning: str
-    signals: List[str]  # Detected keywords/patterns
+    signals: list[str]  # Detected keywords/patterns
 
     def to_dict(self) -> dict:
         return {
@@ -171,7 +170,7 @@ class ContextClassifier:
     def classify_with_override(
         self,
         text: str,
-        override_context: Optional[ContextType] = None,
+        override_context: ContextType | None = None,
     ) -> ContextClassification:
         """
         Classify with manual override option
@@ -206,6 +205,6 @@ class ContextClassifier:
             f"({confidence:.1%}) based on {signal_count} detected signals"
         )
 
-    def batch_classify(self, texts: List[str]) -> List[ContextClassification]:
+    def batch_classify(self, texts: list[str]) -> list[ContextClassification]:
         """Classify multiple texts efficiently"""
         return [self.classify(text) for text in texts]

@@ -4,7 +4,6 @@ F16: F1 score measurement for brand detection accuracy
 """
 
 from dataclasses import dataclass, field
-from typing import List, Dict, Set, Optional, Tuple
 
 from .brand_matcher import BrandMatch
 
@@ -45,8 +44,8 @@ class EvaluationMetrics:
 class EvaluationResult:
     """Complete evaluation result"""
     overall_metrics: EvaluationMetrics
-    per_brand_metrics: Dict[str, EvaluationMetrics] = field(default_factory=dict)
-    per_match_type_metrics: Dict[str, EvaluationMetrics] = field(default_factory=dict)
+    per_brand_metrics: dict[str, EvaluationMetrics] = field(default_factory=dict)
+    per_match_type_metrics: dict[str, EvaluationMetrics] = field(default_factory=dict)
     target_f1: float = 0.80
     passed: bool = False
 
@@ -83,9 +82,9 @@ class Evaluator:
                            If False, only require brand_id match per text.
         """
         self.strict_position = strict_position
-        self.ground_truth: Dict[str, List[GroundTruthEntry]] = {}
+        self.ground_truth: dict[str, list[GroundTruthEntry]] = {}
 
-    def load_ground_truth(self, entries: List[Dict]) -> None:
+    def load_ground_truth(self, entries: list[dict]) -> None:
         """
         Load ground truth annotations
 
@@ -117,8 +116,8 @@ class Evaluator:
 
     def evaluate(
         self,
-        predictions: Dict[str, List[BrandMatch]],
-        ground_truth: Optional[Dict[str, List[GroundTruthEntry]]] = None,
+        predictions: dict[str, list[BrandMatch]],
+        ground_truth: dict[str, list[GroundTruthEntry]] | None = None,
     ) -> EvaluationResult:
         """
         Evaluate predictions against ground truth
@@ -139,10 +138,10 @@ class Evaluator:
         total_tp, total_fp, total_fn = 0, 0, 0
 
         # Per-brand tracking
-        brand_stats: Dict[str, Dict] = {}
+        brand_stats: dict[str, dict] = {}
 
         # Per-match-type tracking
-        type_stats: Dict[str, Dict] = {}
+        type_stats: dict[str, dict] = {}
 
         # Evaluate each text
         all_text_ids = set(gt.keys()) | set(predictions.keys())
@@ -220,9 +219,9 @@ class Evaluator:
 
     def _evaluate_text(
         self,
-        predictions: List[BrandMatch],
-        truth: List[GroundTruthEntry],
-    ) -> Tuple[int, int, int]:
+        predictions: list[BrandMatch],
+        truth: list[GroundTruthEntry],
+    ) -> tuple[int, int, int]:
         """
         Evaluate predictions for a single text
 
@@ -236,9 +235,9 @@ class Evaluator:
 
     def _evaluate_relaxed(
         self,
-        predictions: List[BrandMatch],
-        truth: List[GroundTruthEntry],
-    ) -> Tuple[int, int, int]:
+        predictions: list[BrandMatch],
+        truth: list[GroundTruthEntry],
+    ) -> tuple[int, int, int]:
         """Relaxed evaluation - only brand_id needs to match"""
         pred_brands = {p.brand_id for p in predictions}
         truth_brands = {t.brand_id for t in truth}
@@ -251,12 +250,12 @@ class Evaluator:
 
     def _evaluate_strict(
         self,
-        predictions: List[BrandMatch],
-        truth: List[GroundTruthEntry],
-    ) -> Tuple[int, int, int]:
+        predictions: list[BrandMatch],
+        truth: list[GroundTruthEntry],
+    ) -> tuple[int, int, int]:
         """Strict evaluation - position must also match"""
-        matched_truth: Set[int] = set()
-        matched_pred: Set[int] = set()
+        matched_truth: set[int] = set()
+        matched_pred: set[int] = set()
 
         for i, pred in enumerate(predictions):
             for j, t in enumerate(truth):

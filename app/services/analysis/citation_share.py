@@ -5,7 +5,6 @@ F8: Calculate brand citation share percentage
 
 from collections import defaultdict
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional
 
 from .brand_matcher import BrandMatch, MatchType
 
@@ -17,7 +16,7 @@ class CitationShare:
     brand_name: str
     mention_count: int
     share_percentage: float  # 0.0 - 100.0
-    match_types: Dict[str, int] = field(default_factory=dict)
+    match_types: dict[str, int] = field(default_factory=dict)
     avg_confidence: float = 0.0
 
     def to_dict(self) -> dict:
@@ -34,10 +33,10 @@ class CitationShare:
 @dataclass
 class CitationShareResult:
     """Complete citation share analysis result"""
-    shares: List[CitationShare]
+    shares: list[CitationShare]
     total_mentions: int
     unique_brands: int
-    query_id: Optional[int] = None
+    query_id: int | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -62,8 +61,8 @@ class CitationShareCalculator:
 
     def calculate(
         self,
-        matches: List[BrandMatch],
-        query_id: Optional[int] = None,
+        matches: list[BrandMatch],
+        query_id: int | None = None,
     ) -> CitationShareResult:
         """
         Calculate citation share from brand matches
@@ -84,7 +83,7 @@ class CitationShareCalculator:
             )
 
         # Aggregate by brand
-        brand_data: Dict[int, Dict] = defaultdict(lambda: {
+        brand_data: dict[int, dict] = defaultdict(lambda: {
             "brand_name": "",
             "count": 0,
             "match_types": defaultdict(int),
@@ -100,7 +99,7 @@ class CitationShareCalculator:
 
         # Calculate shares
         total_mentions = len(matches)
-        shares: List[CitationShare] = []
+        shares: list[CitationShare] = []
 
         for brand_id, data in brand_data.items():
             avg_confidence = sum(data["confidences"]) / len(data["confidences"])
@@ -127,7 +126,7 @@ class CitationShareCalculator:
 
     def calculate_aggregated(
         self,
-        matches_by_query: Dict[int, List[BrandMatch]],
+        matches_by_query: dict[int, list[BrandMatch]],
     ) -> CitationShareResult:
         """
         Calculate aggregated citation share across multiple queries
@@ -146,8 +145,8 @@ class CitationShareCalculator:
 
     def calculate_weighted(
         self,
-        matches: List[BrandMatch],
-        query_id: Optional[int] = None,
+        matches: list[BrandMatch],
+        query_id: int | None = None,
     ) -> CitationShareResult:
         """
         Calculate weighted citation share based on confidence and match type
@@ -175,7 +174,7 @@ class CitationShareCalculator:
         }
 
         # Calculate weighted scores
-        brand_weights: Dict[int, Dict] = defaultdict(lambda: {
+        brand_weights: dict[int, dict] = defaultdict(lambda: {
             "brand_name": "",
             "weight": 0.0,
             "count": 0,
@@ -200,7 +199,7 @@ class CitationShareCalculator:
             total_weight += weight
 
         # Calculate shares
-        shares: List[CitationShare] = []
+        shares: list[CitationShare] = []
 
         for brand_id, data in brand_weights.items():
             avg_confidence = sum(data["confidences"]) / len(data["confidences"])
