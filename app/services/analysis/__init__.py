@@ -3,11 +3,11 @@ Analysis Services Module
 Brand matching, sentiment analysis, context classification, citation share, and evaluation
 """
 
-from .brand_matcher import BrandMatcher, BrandMatch, Brand, MatchType
+from .brand_matcher import Brand, BrandMatch, BrandMatcher, MatchType
+from .citation_share import CitationShare, CitationShareCalculator, CitationShareResult
+from .context_classifier import ContextClassification, ContextClassifier, ContextType
+from .evaluator import EvaluationMetrics, EvaluationResult, Evaluator, GroundTruthEntry
 from .sentiment import SentimentAnalyzer, SentimentResult, SentimentType
-from .context_classifier import ContextClassifier, ContextClassification, ContextType
-from .citation_share import CitationShareCalculator, CitationShare, CitationShareResult
-from .evaluator import Evaluator, EvaluationResult, EvaluationMetrics, GroundTruthEntry
 
 __all__ = [
     # Brand Matching (F5)

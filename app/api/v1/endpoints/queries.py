@@ -3,9 +3,9 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import DbSession, CurrentUser
-from app.models.query import Query, QueryStatus
+from app.api.deps import CurrentUser, DbSession
 from app.models.project import Project
+from app.models.query import Query, QueryStatus
 from app.schemas.query import QueryCreate, QueryResponse
 
 router = APIRouter(prefix="/queries", tags=["queries"])

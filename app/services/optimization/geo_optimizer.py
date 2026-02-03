@@ -5,11 +5,10 @@ F9: Analyze brand performance and generate GEO optimization recommendations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Optional, Dict
 
 from ..analysis.brand_matcher import BrandMatch
 from ..analysis.citation_share import CitationShareResult
-from ..analysis.context_classifier import ContextType, ContextClassification
+from ..analysis.context_classifier import ContextClassification, ContextType
 from ..analysis.sentiment_analyzer import SentimentResult
 
 
@@ -41,7 +40,7 @@ class OptimizationAction:
     description: str
     expected_impact: str  # "citation_share +5-10%"
     effort: str           # "low|medium|high"
-    metrics: Dict[str, float] = field(default_factory=dict)
+    metrics: dict[str, float] = field(default_factory=dict)
 
     def to_dict(self) -> dict:
         return {
@@ -63,9 +62,9 @@ class BrandPerformance:
     citation_share: float
     mention_count: int
     avg_sentiment: float
-    sentiment_distribution: Dict[str, int]
-    context_distribution: Dict[str, int]
-    primary_contexts: List[ContextType]
+    sentiment_distribution: dict[str, int]
+    context_distribution: dict[str, int]
+    primary_contexts: list[ContextType]
 
     def to_dict(self) -> dict:
         return {
@@ -84,10 +83,10 @@ class BrandPerformance:
 class GEOAnalysis:
     """Complete GEO optimization analysis"""
     brand_performance: BrandPerformance
-    optimization_actions: List[OptimizationAction]
-    competitive_insights: Dict[str, any]
+    optimization_actions: list[OptimizationAction]
+    competitive_insights: dict[str, any]
     overall_score: float  # 0-100
-    query_id: Optional[int] = None
+    query_id: int | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -114,10 +113,10 @@ class GEOOptimizer:
         self,
         brand_id: int,
         citation_result: CitationShareResult,
-        matches: List[BrandMatch],
-        sentiments: Optional[List[SentimentResult]] = None,
-        contexts: Optional[List[ContextClassification]] = None,
-        query_id: Optional[int] = None,
+        matches: list[BrandMatch],
+        sentiments: list[SentimentResult] | None = None,
+        contexts: list[ContextClassification] | None = None,
+        query_id: int | None = None,
     ) -> GEOAnalysis:
         """
         Generate GEO optimization analysis for a brand
@@ -212,7 +211,7 @@ class GEOOptimizer:
         self,
         brand_id: int,
         total_mentions: int,
-        query_id: Optional[int],
+        query_id: int | None,
     ) -> GEOAnalysis:
         """Generate analysis for brands with zero mentions"""
         performance = BrandPerformance(
@@ -263,7 +262,7 @@ class GEOOptimizer:
         self,
         performance: BrandPerformance,
         citation_result: CitationShareResult,
-    ) -> List[OptimizationAction]:
+    ) -> list[OptimizationAction]:
         """Generate optimization recommendations based on performance"""
         actions = []
 
@@ -355,7 +354,7 @@ class GEOOptimizer:
         self,
         brand_share,
         citation_result: CitationShareResult,
-    ) -> Dict[str, any]:
+    ) -> dict[str, any]:
         """Analyze competitive landscape"""
         competitors = [s for s in citation_result.shares if s.brand_id != brand_share.brand_id]
 

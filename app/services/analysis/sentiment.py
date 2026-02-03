@@ -3,9 +3,12 @@ Sentiment Analyzer
 F6: Gemini-based sentiment analysis with rule-based fallback
 """
 
+import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..llm.base import BaseLLMService
@@ -23,7 +26,7 @@ class SentimentResult:
     """Sentiment analysis result"""
     sentiment: SentimentType
     confidence: float  # 0.0 - 1.0
-    reasoning: Optional[str] = None
+    reasoning: str | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -74,7 +77,7 @@ class SentimentAnalyzer:
     async def analyze(
         self,
         text: str,
-        brand_context: Optional[str] = None,
+        brand_context: str | None = None,
         use_llm: bool = True,
     ) -> SentimentResult:
         """
@@ -94,8 +97,8 @@ class SentimentAnalyzer:
                 result = await self._llm_analyze(text, brand_context)
                 if result:
                     return result
-            except Exception:
-                pass  # Fall back to rule-based
+            except Exception as e:
+                logger.warning(f"LLM sentiment analysis failed, falling back to rule-based: {e}")
 
         # Rule-based fallback
         return self._rule_based_analyze(text, brand_context)
@@ -103,8 +106,8 @@ class SentimentAnalyzer:
     async def _llm_analyze(
         self,
         text: str,
-        brand_context: Optional[str],
-    ) -> Optional[SentimentResult]:
+        brand_context: str | None,
+    ) -> SentimentResult | None:
         """Use LLM for sentiment analysis"""
         if not self.llm_service:
             return None
@@ -117,16 +120,20 @@ class SentimentAnalyzer:
         except ValueError:
             sentiment = SentimentType.NEUTRAL
 
+        # Clamp confidence to valid range
+        confidence = float(result.get("confidence", 0.5))
+        confidence = max(0.0, min(1.0, confidence))
+
         return SentimentResult(
             sentiment=sentiment,
-            confidence=float(result.get("confidence", 0.5)),
+            confidence=confidence,
             reasoning=result.get("reasoning"),
         )
 
     def _rule_based_analyze(
         self,
         text: str,
-        brand_context: Optional[str],
+        brand_context: str | None,
     ) -> SentimentResult:
         """Rule-based sentiment analysis fallback"""
         text_lower = text.lower()
@@ -186,7 +193,7 @@ class SentimentAnalyzer:
     def analyze_sync(
         self,
         text: str,
-        brand_context: Optional[str] = None,
+        brand_context: str | None = None,
     ) -> SentimentResult:
         """Synchronous rule-based analysis (for testing)"""
         return self._rule_based_analyze(text, brand_context)

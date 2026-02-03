@@ -3,11 +3,15 @@ Brand Matcher
 F5: Match brand names in AI responses with fuzzy matching
 """
 
-from dataclasses import dataclass
-from enum import Enum
-from typing import List, Optional, Set
-from difflib import SequenceMatcher
+import logging
 import re
+from dataclasses import dataclass
+from difflib import SequenceMatcher
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+MAX_TEXT_LENGTH = 100000  # 100KB limit for text input
 
 
 class MatchType(Enum):
@@ -23,10 +27,10 @@ class Brand:
     """Brand entity"""
     id: int
     name: str
-    aliases: List[str]
-    keywords: List[str]
+    aliases: list[str]
+    keywords: list[str]
 
-    def all_names(self) -> Set[str]:
+    def all_names(self) -> set[str]:
         """Get all searchable names (name + aliases)"""
         return {self.name.lower(), *(a.lower() for a in self.aliases)}
 
@@ -67,7 +71,7 @@ class BrandMatcher:
 
     def __init__(
         self,
-        brands: List[Brand],
+        brands: list[Brand],
         fuzzy_threshold: float = 0.85,
         keyword_threshold: float = 0.7,
     ):
@@ -106,7 +110,7 @@ class BrandMatcher:
                     self.keyword_index[keyword.lower()] = []
                 self.keyword_index[keyword.lower()].append(brand)
 
-    def match(self, text: str) -> List[BrandMatch]:
+    def match(self, text: str) -> list[BrandMatch]:
         """
         Find all brand matches in text
 
@@ -118,6 +122,10 @@ class BrandMatcher:
         """
         if not text or not text.strip():
             return []
+
+        if len(text) > MAX_TEXT_LENGTH:
+            logger.warning(f"Text truncated from {len(text)} to {MAX_TEXT_LENGTH}")
+            text = text[:MAX_TEXT_LENGTH]
 
         matches = []
 
@@ -137,7 +145,7 @@ class BrandMatcher:
 
         return matches
 
-    def _exact_match(self, text: str) -> List[BrandMatch]:
+    def _exact_match(self, text: str) -> list[BrandMatch]:
         """Find exact name and alias matches"""
         matches = []
         text_lower = text.lower()
@@ -172,7 +180,7 @@ class BrandMatcher:
 
         return matches
 
-    def _fuzzy_match(self, text: str, exclude_brands: Set[int]) -> List[BrandMatch]:
+    def _fuzzy_match(self, text: str, exclude_brands: set[int]) -> list[BrandMatch]:
         """Find fuzzy matches using string similarity"""
         matches = []
         words = re.findall(r'\b\w+\b', text.lower())
@@ -207,7 +215,7 @@ class BrandMatcher:
 
         return matches
 
-    def _keyword_match(self, text: str, exclude_brands: Set[int]) -> List[BrandMatch]:
+    def _keyword_match(self, text: str, exclude_brands: set[int]) -> list[BrandMatch]:
         """Find keyword-based matches"""
         matches = []
         text_lower = text.lower()
@@ -252,7 +260,7 @@ class BrandMatcher:
 
         return context
 
-    def _deduplicate(self, matches: List[BrandMatch]) -> List[BrandMatch]:
+    def _deduplicate(self, matches: list[BrandMatch]) -> list[BrandMatch]:
         """Remove duplicate matches, keeping highest confidence"""
         seen = {}
 
@@ -264,7 +272,7 @@ class BrandMatcher:
 
         return list(seen.values())
 
-    def match_single_brand(self, text: str, brand_id: int) -> Optional[BrandMatch]:
+    def match_single_brand(self, text: str, brand_id: int) -> BrandMatch | None:
         """
         Check if a specific brand is mentioned
 
@@ -281,7 +289,7 @@ class BrandMatcher:
                 return match
         return None
 
-    def get_brand_by_id(self, brand_id: int) -> Optional[Brand]:
+    def get_brand_by_id(self, brand_id: int) -> Brand | None:
         """Get brand by ID"""
         for brand in self.brands:
             if brand.id == brand_id:

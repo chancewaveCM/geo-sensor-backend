@@ -3,10 +3,12 @@
 from datetime import timedelta
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
-from app.api.deps import DbSession, CurrentUser
+from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
 from app.core.security import create_access_token
 from app.schemas.token import Token
@@ -14,10 +16,13 @@ from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 @router.post("/login", response_model=Token)
+@limiter.limit("5/minute")
 async def login(
+    request: Request,
     db: DbSession,
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
 ) -> Token:
@@ -44,7 +49,9 @@ async def login(
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("3/minute")
 async def register(
+    request: Request,
     db: DbSession,
     user_in: UserCreate,
 ) -> UserResponse:

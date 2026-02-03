@@ -1,7 +1,8 @@
-from sqlalchemy import String, ForeignKey, Float, Integer, Enum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from typing import TYPE_CHECKING
+
+from sqlalchemy import Enum, Float, ForeignKey, Integer, String
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 

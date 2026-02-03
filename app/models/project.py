@@ -1,13 +1,14 @@
-from sqlalchemy import String, ForeignKey, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 from typing import TYPE_CHECKING
+
+from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.user import User
     from app.models.brand import Brand
     from app.models.query import Query
+    from app.models.user import User
 
 
 class Project(Base, TimestampMixin):

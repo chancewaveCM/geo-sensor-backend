@@ -6,7 +6,6 @@ F4: LLM Service with Gemini + OpenAI providers
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class LLMProvider(Enum):
@@ -23,7 +22,7 @@ class LLMResponse:
     model: str
     tokens_used: int
     latency_ms: float
-    raw_response: Optional[dict] = None
+    raw_response: dict | None = None
 
 
 class BaseLLMService(ABC):
@@ -36,7 +35,7 @@ class BaseLLMService(ABC):
     async def generate(
         self,
         prompt: str,
-        system_prompt: Optional[str] = None,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 1024,
     ) -> LLMResponse:
@@ -44,7 +43,7 @@ class BaseLLMService(ABC):
         pass
 
     @abstractmethod
-    async def analyze_sentiment(self, text: str, brand_context: Optional[str] = None) -> dict:
+    async def analyze_sentiment(self, text: str, brand_context: str | None = None) -> dict:
         """
         Analyze sentiment of text regarding a brand
         Returns: {"sentiment": "positive|neutral|negative", "confidence": 0.0-1.0, "reasoning": str}

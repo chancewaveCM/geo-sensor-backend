@@ -6,9 +6,9 @@ GEO optimization analysis
 from .geo_analyzer import (
     GEOOptimizationAnalyzer,
     GEOScore,
+    Grade,
     TriggerResult,
     TriggerType,
-    Grade,
 )
 
 __all__ = [

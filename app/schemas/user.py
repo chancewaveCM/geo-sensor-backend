@@ -33,7 +33,7 @@ class UserCreate(UserBase):
 class UserUpdate(BaseModel):
     email: EmailStr | None = None
     full_name: str | None = None
-    password: str | None = Field(None, min_length=8, max_length=128)
+    password: str | None = Field(default=None, min_length=8, max_length=128)
 
     @field_validator("password")
     @classmethod

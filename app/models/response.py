@@ -1,13 +1,14 @@
-from sqlalchemy import String, ForeignKey, Text, Float, JSON, Enum
-from sqlalchemy.orm import Mapped, mapped_column, relationship
 import enum
 from typing import TYPE_CHECKING
+
+from sqlalchemy import JSON, Enum, Float, ForeignKey, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
-    from app.models.query import Query
     from app.models.citation import Citation
+    from app.models.query import Query
 
 
 class LLMProvider(str, enum.Enum):

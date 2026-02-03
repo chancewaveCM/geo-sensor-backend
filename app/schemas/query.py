@@ -1,10 +1,12 @@
-from pydantic import BaseModel, ConfigDict
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
 from app.models.query import QueryStatus
 
 
 class QueryBase(BaseModel):
-    text: str
+    text: str = Field(..., min_length=1, max_length=100000)
 
 
 class QueryCreate(QueryBase):
