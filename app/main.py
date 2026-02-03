@@ -1,8 +1,41 @@
-from fastapi import FastAPI
+import time
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.logging import get_logger, set_correlation_id
+
+logger = get_logger(__name__)
+
+
+class RequestLoggingMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        correlation_id = set_correlation_id()
+        start_time = time.time()
+
+        try:
+            response = await call_next(request)
+            process_time = time.time() - start_time
+            logger.info(
+                f"{request.method} {request.url.path} "
+                f"status={response.status_code} "
+                f"duration={process_time:.3f}s"
+            )
+            response.headers["X-Correlation-ID"] = correlation_id
+            response.headers["X-Process-Time"] = str(process_time)
+            return response
+        except Exception as e:
+            process_time = time.time() - start_time
+            logger.error(
+                f"{request.method} {request.url.path} "
+                f"error={type(e).__name__}: {e} "
+                f"duration={process_time:.3f}s"
+            )
+            raise
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -12,6 +45,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,

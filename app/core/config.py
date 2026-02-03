@@ -1,7 +1,10 @@
+import warnings
 from functools import lru_cache
-from typing import List
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_INSECURE_SECRET_KEY = "dev-secret-key-change-in-production"
 
 
 class Settings(BaseSettings):
@@ -20,10 +23,22 @@ class Settings(BaseSettings):
     # Server
     HOST: str = "0.0.0.0"
     PORT: int = 8075
-    DEBUG: bool = True
+    DEBUG: bool = False
 
     # Security
-    SECRET_KEY: str = "dev-secret-key-change-in-production"
+    SECRET_KEY: str = _INSECURE_SECRET_KEY
+
+    @model_validator(mode="after")
+    def validate_secret_key(self) -> "Settings":
+        """Warn if using insecure default SECRET_KEY in non-debug mode."""
+        if not self.DEBUG and self.SECRET_KEY == _INSECURE_SECRET_KEY:
+            warnings.warn(
+                "Using insecure default SECRET_KEY in production! "
+                "Set SECRET_KEY environment variable.",
+                UserWarning,
+                stacklevel=2,
+            )
+        return self
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     ALGORITHM: str = "HS256"
 
@@ -31,7 +46,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./geo_sensor.db"
 
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: list[str] = [
         "http://localhost:3000",
         "http://localhost:3001",
         "http://localhost:3002",

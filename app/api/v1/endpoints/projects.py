@@ -3,9 +3,10 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import DbSession, CurrentUser
+from app.api.deps import CurrentUser, DbSession, Pagination
+from app.core.constants import ERROR_PROJECT_NOT_FOUND
 from app.models.project import Project
-from app.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -14,15 +15,14 @@ router = APIRouter(prefix="/projects", tags=["projects"])
 async def list_projects(
     db: DbSession,
     current_user: CurrentUser,
-    skip: int = 0,
-    limit: int = 100,
+    pagination: Pagination,
 ) -> list[ProjectResponse]:
     """List all projects for current user."""
     result = await db.execute(
         select(Project)
         .where(Project.owner_id == current_user.id)
-        .offset(skip)
-        .limit(limit)
+        .offset(pagination.skip)
+        .limit(pagination.limit)
     )
     projects = result.scalars().all()
     return [ProjectResponse.model_validate(p) for p in projects]
@@ -61,7 +61,7 @@ async def get_project(
     )
     project = result.scalar_one_or_none()
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ERROR_PROJECT_NOT_FOUND)
     return ProjectResponse.model_validate(project)
 
 
@@ -81,7 +81,7 @@ async def update_project(
     )
     project = result.scalar_one_or_none()
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ERROR_PROJECT_NOT_FOUND)
 
     update_data = project_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -107,7 +107,7 @@ async def delete_project(
     )
     project = result.scalar_one_or_none()
     if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+        raise HTTPException(status_code=404, detail=ERROR_PROJECT_NOT_FOUND)
 
     await db.delete(project)
     await db.commit()
