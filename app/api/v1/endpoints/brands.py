@@ -3,7 +3,8 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, Pagination, verify_project_access
+from app.core.constants import ERROR_BRAND_NOT_FOUND
 from app.models.brand import Brand
 from app.models.project import Project
 from app.schemas.brand import BrandCreate, BrandResponse, BrandUpdate
@@ -11,24 +12,12 @@ from app.schemas.brand import BrandCreate, BrandResponse, BrandUpdate
 router = APIRouter(prefix="/brands", tags=["brands"])
 
 
-async def verify_project_access(db: DbSession, project_id: int, user_id: int) -> Project:
-    """Verify user has access to project."""
-    result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.owner_id == user_id)
-    )
-    project = result.scalar_one_or_none()
-    if project is None:
-        raise HTTPException(status_code=404, detail="Project not found")
-    return project
-
-
 @router.get("/", response_model=list[BrandResponse])
 async def list_brands(
     db: DbSession,
     current_user: CurrentUser,
     project_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    pagination: Pagination,
 ) -> list[BrandResponse]:
     """List all brands for a project."""
     await verify_project_access(db, project_id, current_user.id)
@@ -36,8 +25,8 @@ async def list_brands(
     result = await db.execute(
         select(Brand)
         .where(Brand.project_id == project_id)
-        .offset(skip)
-        .limit(limit)
+        .offset(pagination.skip)
+        .limit(pagination.limit)
     )
     brands = result.scalars().all()
     return [BrandResponse.model_validate(b) for b in brands]
@@ -79,7 +68,7 @@ async def get_brand(
     )
     brand = result.scalar_one_or_none()
     if brand is None:
-        raise HTTPException(status_code=404, detail="Brand not found")
+        raise HTTPException(status_code=404, detail=ERROR_BRAND_NOT_FOUND)
     return BrandResponse.model_validate(brand)
 
 
@@ -98,7 +87,7 @@ async def update_brand(
     )
     brand = result.scalar_one_or_none()
     if brand is None:
-        raise HTTPException(status_code=404, detail="Brand not found")
+        raise HTTPException(status_code=404, detail=ERROR_BRAND_NOT_FOUND)
 
     update_data = brand_in.model_dump(exclude_unset=True)
     for field, value in update_data.items():
@@ -123,7 +112,7 @@ async def delete_brand(
     )
     brand = result.scalar_one_or_none()
     if brand is None:
-        raise HTTPException(status_code=404, detail="Brand not found")
+        raise HTTPException(status_code=404, detail=ERROR_BRAND_NOT_FOUND)
 
     await db.delete(brand)
     await db.commit()

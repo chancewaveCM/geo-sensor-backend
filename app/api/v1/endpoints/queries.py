@@ -3,7 +3,8 @@
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, DbSession
+from app.api.deps import CurrentUser, DbSession, Pagination, verify_project_access
+from app.core.constants import ERROR_QUERY_NOT_FOUND
 from app.models.project import Project
 from app.models.query import Query, QueryStatus
 from app.schemas.query import QueryCreate, QueryResponse
@@ -16,22 +17,16 @@ async def list_queries(
     db: DbSession,
     current_user: CurrentUser,
     project_id: int,
-    skip: int = 0,
-    limit: int = 100,
+    pagination: Pagination,
 ) -> list[QueryResponse]:
     """List all queries for a project."""
-    # Verify project access
-    result = await db.execute(
-        select(Project).where(Project.id == project_id, Project.owner_id == current_user.id)
-    )
-    if result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await verify_project_access(db, project_id, current_user.id)
 
     result = await db.execute(
         select(Query)
         .where(Query.project_id == project_id)
-        .offset(skip)
-        .limit(limit)
+        .offset(pagination.skip)
+        .limit(pagination.limit)
     )
     queries = result.scalars().all()
     return [QueryResponse.model_validate(q) for q in queries]
@@ -44,15 +39,7 @@ async def create_query(
     query_in: QueryCreate,
 ) -> QueryResponse:
     """Create new query."""
-    # Verify project access
-    result = await db.execute(
-        select(Project).where(
-            Project.id == query_in.project_id,
-            Project.owner_id == current_user.id
-        )
-    )
-    if result.scalar_one_or_none() is None:
-        raise HTTPException(status_code=404, detail="Project not found")
+    await verify_project_access(db, query_in.project_id, current_user.id)
 
     query = Query(
         text=query_in.text,
@@ -79,7 +66,7 @@ async def get_query(
     )
     query = result.scalar_one_or_none()
     if query is None:
-        raise HTTPException(status_code=404, detail="Query not found")
+        raise HTTPException(status_code=404, detail=ERROR_QUERY_NOT_FOUND)
     return QueryResponse.model_validate(query)
 
 
@@ -97,7 +84,7 @@ async def delete_query(
     )
     query = result.scalar_one_or_none()
     if query is None:
-        raise HTTPException(status_code=404, detail="Query not found")
+        raise HTTPException(status_code=404, detail=ERROR_QUERY_NOT_FOUND)
 
     await db.delete(query)
     await db.commit()
