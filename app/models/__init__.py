@@ -1,6 +1,12 @@
 from app.models.base import Base, TimestampMixin
 from app.models.brand import Brand
 from app.models.citation import Citation, MatchType
+from app.models.company_profile import CompanyProfile
+from app.models.generated_query import (
+    GeneratedQuery,
+    GeneratedQueryStatus,
+    QueryCategory,
+)
 from app.models.project import Project
 from app.models.query import Query, QueryStatus
 from app.models.response import LLMProvider, Response
@@ -18,4 +24,8 @@ __all__ = [
     "LLMProvider",
     "Citation",
     "MatchType",
+    "CompanyProfile",
+    "GeneratedQuery",
+    "GeneratedQueryStatus",
+    "QueryCategory",
 ]

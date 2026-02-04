@@ -1,15 +1,27 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import analysis, auth, brands, projects, queries
+from app.api.v1.endpoints import (
+    analysis,
+    auth,
+    brands,
+    company_profiles,
+    generated_queries,
+    projects,
+    queries,
+    users,
+)
 
 api_router = APIRouter()
 
 # Include all routers
 api_router.include_router(auth.router)
+api_router.include_router(users.router)
 api_router.include_router(projects.router)
 api_router.include_router(brands.router)
 api_router.include_router(queries.router)
 api_router.include_router(analysis.router)
+api_router.include_router(company_profiles.router)
+api_router.include_router(generated_queries.router)
 
 
 @api_router.get("/")
