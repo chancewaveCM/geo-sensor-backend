@@ -62,7 +62,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     DEFAULT_LLM_PROVIDER: str = "gemini"
-    GEMINI_MODEL: str = "gemini-1.5-flash"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
     OPENAI_MODEL: str = "gpt-4o-mini"
 
     # Analysis Settings
