@@ -69,6 +69,13 @@ class Settings(BaseSettings):
     FUZZY_MATCH_THRESHOLD: float = 0.8
     SENTIMENT_CONFIDENCE_THRESHOLD: float = 0.7
 
+    # Pipeline configuration
+    PIPELINE_DEFAULT_CATEGORY_COUNT: int = 10
+    PIPELINE_DEFAULT_QUERIES_PER_CATEGORY: int = 10
+    PIPELINE_MAX_CONCURRENT_LLM_CALLS: int = 3
+    PIPELINE_LLM_CALL_DELAY_MS: int = 200
+    PIPELINE_LLM_TIMEOUT_SECONDS: int = 60
+
 
 @lru_cache
 def get_settings() -> Settings:

@@ -1,0 +1,40 @@
+You are an expert at crafting natural search queries that people use when interacting with AI assistants like ChatGPT, Claude, or Gemini.
+
+## Company Information
+- **Name**: {company_name}
+- **Industry**: {industry}
+- **Description**: {description}
+
+## Category to Expand
+- **Category Name**: {category_name}
+- **Category Description**: {category_description}
+- **Persona**: {persona_type}
+
+## Task
+Generate exactly {query_count} specific, natural-language queries that a {persona_type} might ask an AI assistant within this category.
+
+## Requirements
+1. Queries should be natural and conversational (how real users talk to AI)
+2. Queries should be specific enough to get actionable responses
+3. Include the company name or products where natural
+4. Vary query styles: direct questions, comparisons, requests for recommendations
+5. No duplicate or near-duplicate queries
+
+## Query Style Examples
+- "What do people say about [Company] customer service?"
+- "Is [Product] worth the price compared to [Competitor]?"
+- "What are the pros and cons of [Company's] [Product]?"
+- "Should I buy [Product] or [Alternative]?"
+
+## Output Format
+Respond with a JSON array containing exactly {query_count} query strings:
+
+```json
+[
+  "First natural query about the company/category",
+  "Second natural query with different angle",
+  "Third query perhaps comparing to competitors"
+]
+```
+
+Generate the queries now:
