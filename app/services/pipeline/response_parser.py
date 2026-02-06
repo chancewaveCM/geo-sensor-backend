@@ -17,7 +17,7 @@ def extract_json_from_response(content: str) -> Any:
     - ```json ... ``` blocks
     - ``` ... ``` blocks
     """
-    # Try to find JSON in code blocks first
+    # Step 1: Try to find JSON in code blocks (with closing ```)
     code_block_pattern = r"```(?:json)?\s*([\s\S]*?)```"
     matches = re.findall(code_block_pattern, content)
 
@@ -28,13 +28,23 @@ def extract_json_from_response(content: str) -> Any:
             except json.JSONDecodeError:
                 continue
 
-    # Try parsing the entire content as JSON
+    # Step 2: Handle unclosed code blocks (```json without closing ```)
+    unclosed_pattern = r"```(?:json)?\s*([\s\S]*)"
+    unclosed_match = re.match(unclosed_pattern, content.strip())
+    if unclosed_match:
+        inner = unclosed_match.group(1).strip().rstrip("`")
+        try:
+            return json.loads(inner)
+        except json.JSONDecodeError:
+            pass
+
+    # Step 3: Try parsing the entire content as JSON
     try:
         return json.loads(content.strip())
     except json.JSONDecodeError:
         pass
 
-    # Try to find JSON array or object in the content
+    # Step 4: Find first JSON array or object in the content
     json_pattern = r"(\[[\s\S]*\]|\{[\s\S]*\})"
     matches = re.findall(json_pattern, content)
 

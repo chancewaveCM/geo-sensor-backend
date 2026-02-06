@@ -23,6 +23,12 @@ class OpenAIService(BaseLLMService):
 
     provider = LLMProvider.OPENAI
 
+    # Models that do NOT support temperature/top_p/logprobs
+    # (only gpt-5.2 with reasoning.effort=none supports them)
+    _NO_TEMPERATURE_MODELS = {
+        "gpt-5-nano", "gpt-5-mini", "gpt-5", "gpt-5.1",
+    }
+
     def __init__(self, api_key: str, model: str = "gpt-5-nano"):
         self.api_key = api_key
         self.model = model
@@ -55,11 +61,20 @@ class OpenAIService(BaseLLMService):
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        # Build request params — filter unsupported params by model
+        request_params: dict = {
+            "model": self.model,
+            "messages": messages,
+            "max_completion_tokens": max_tokens,
+        }
+
+        # gpt-5-nano/mini/5/5.1 don't support temperature
+        supports_temp = self.model not in self._NO_TEMPERATURE_MODELS
+        if supports_temp and temperature != 1.0:
+            request_params["temperature"] = temperature
+
         response = await client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            temperature=temperature,
-            max_completion_tokens=max_tokens,
+            **request_params
         )
 
         latency_ms = (time.time() - start_time) * 1000

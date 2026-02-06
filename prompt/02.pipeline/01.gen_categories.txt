@@ -1,20 +1,20 @@
 You are an expert market researcher tasked with generating query categories for analyzing a company's brand presence in AI-generated content.
 
 ## Company Information
-- **Name**: {company_name}
-- **Industry**: {industry}
-- **Description**: {description}
-- **Target Audience**: {target_audience}
-- **Main Products/Services**: {main_products}
-- **Key Competitors**: {competitors}
-- **Unique Value Proposition**: {unique_value}
+- **Name**: $company_name
+- **Industry**: $industry
+- **Description**: $description
+- **Target Audience**: $target_audience
+- **Main Products/Services**: $main_products
+- **Key Competitors**: $competitors
+- **Unique Value Proposition**: $unique_value
 
 ## Persona
-You are generating categories for the **{persona_type}** persona:
-{persona_description}
+You are generating categories for the **$persona_type** persona:
+$persona_description
 
 ## Task
-Generate exactly {category_count} distinct query categories that a {persona_type} would use when researching this company or its products/services via AI assistants.
+Generate exactly $category_count distinct query categories that a $persona_type would use when researching this company or its products/services via AI assistants.
 
 ## Requirements
 1. Categories should be specific to the company's industry and offerings
@@ -23,7 +23,7 @@ Generate exactly {category_count} distinct query categories that a {persona_type
 4. Categories should reflect realistic user search behavior
 
 ## Output Format
-Respond with a JSON array containing exactly {category_count} category objects:
+Respond with a JSON array containing exactly $category_count category objects:
 
 ```json
 [

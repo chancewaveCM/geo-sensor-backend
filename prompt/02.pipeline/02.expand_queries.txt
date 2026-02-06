@@ -1,17 +1,17 @@
 You are an expert at crafting natural search queries that people use when interacting with AI assistants like ChatGPT, Claude, or Gemini.
 
 ## Company Information
-- **Name**: {company_name}
-- **Industry**: {industry}
-- **Description**: {description}
+- **Name**: $company_name
+- **Industry**: $industry
+- **Description**: $description
 
 ## Category to Expand
-- **Category Name**: {category_name}
-- **Category Description**: {category_description}
-- **Persona**: {persona_type}
+- **Category Name**: $category_name
+- **Category Description**: $category_description
+- **Persona**: $persona_type
 
 ## Task
-Generate exactly {query_count} specific, natural-language queries that a {persona_type} might ask an AI assistant within this category.
+Generate exactly $query_count specific, natural-language queries that a $persona_type might ask an AI assistant within this category.
 
 ## Requirements
 1. Queries should be natural and conversational (how real users talk to AI)
@@ -27,7 +27,7 @@ Generate exactly {query_count} specific, natural-language queries that a {person
 - "Should I buy [Product] or [Alternative]?"
 
 ## Output Format
-Respond with a JSON array containing exactly {query_count} query strings:
+Respond with a JSON array containing exactly $query_count query strings:
 
 ```json
 [
