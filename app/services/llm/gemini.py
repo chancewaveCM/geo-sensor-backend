@@ -77,7 +77,13 @@ class GeminiService(BaseLLMService):
             ),
             latency_ms=latency_ms,
             raw_response=(
-                {"candidates": [c.text for c in response.candidates]}
+                {
+                    "candidates": [
+                        c.content.parts[0].text
+                        for c in response.candidates
+                        if c.content and c.content.parts
+                    ]
+                }
                 if response.candidates else None
             ),
         )
