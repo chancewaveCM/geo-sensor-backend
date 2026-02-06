@@ -7,7 +7,7 @@ from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import PersonaType
+from app.models.enums import LLMProvider, PersonaType
 
 if TYPE_CHECKING:
     from app.models.company_profile import CompanyProfile
@@ -25,6 +25,9 @@ class PipelineCategory(Base, TimestampMixin):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     persona_type: Mapped[PersonaType] = mapped_column(
         SQLEnum(PersonaType), nullable=False
+    )
+    llm_provider: Mapped[LLMProvider] = mapped_column(
+        SQLEnum(LLMProvider), nullable=False
     )
     order_index: Mapped[int] = mapped_column(Integer, nullable=False)
 

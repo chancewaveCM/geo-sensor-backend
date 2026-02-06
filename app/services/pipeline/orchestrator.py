@@ -5,6 +5,7 @@ from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models.company_profile import CompanyProfile
 from app.models.enums import ExpandedQueryStatus, LLMProvider, PersonaType, PipelineStatus
@@ -25,13 +26,13 @@ class PipelineOrchestratorService:
     def __init__(
         self,
         db: AsyncSession,
-        category_generator: CategoryGeneratorService,
-        query_expander: QueryExpanderService,
+        category_generators: dict[LLMProvider, CategoryGeneratorService],
+        query_expanders: dict[LLMProvider, QueryExpanderService],
         query_executor: QueryExecutorService,
     ):
         self.db = db
-        self.category_gen = category_generator
-        self.query_expander = query_expander
+        self.category_generators = category_generators
+        self.query_expanders = query_expanders
         self.executor = query_executor
 
     async def start_pipeline(
@@ -66,16 +67,19 @@ class PipelineOrchestratorService:
             if is_rerun:
                 # Rerun: Use existing categories and queries from QuerySet
                 await self._update_status(job, PipelineStatus.EXECUTING_QUERIES)
+                selected_providers = [LLMProvider(p) for p in job.llm_providers]
                 result = await self.db.execute(
                     select(ExpandedQuery)
                     .join(PipelineCategory)
                     .where(PipelineCategory.query_set_id == query_set.id)
+                    .where(PipelineCategory.llm_provider.in_(selected_providers))
+                    .options(selectinload(ExpandedQuery.category))
                 )
                 queries = result.scalars().all()
+                query_entries = [(query, query.category.llm_provider) for query in queries]
 
                 # Set total_queries for progress tracking in reruns
-                provider_count = len(job.llm_providers)
-                job.total_queries = len(queries) * provider_count
+                job.total_queries = len(query_entries)
                 await self.db.commit()
             else:
                 # First run: Generate categories and queries
@@ -85,13 +89,13 @@ class PipelineOrchestratorService:
                 )
 
                 await self._update_status(job, PipelineStatus.EXPANDING_QUERIES)
-                queries = await self._expand_queries(
+                query_entries = await self._expand_queries(
                     job, company_profile, categories, query_set
                 )
 
             # Execute queries (both first run and rerun)
             await self._update_status(job, PipelineStatus.EXECUTING_QUERIES)
-            await self._execute_queries(job, queries)
+            await self._execute_queries(job, query_entries)
 
             # Complete
             await self._complete_job(job)
@@ -118,33 +122,40 @@ class PipelineOrchestratorService:
     ) -> list[PipelineCategory]:
         """Generate categories for both personas with proper distribution."""
         categories = []
+        selected_providers = [LLMProvider(p) for p in job.llm_providers]
 
-        # Fixed: Use ceiling division to handle odd counts
-        consumer_count = (query_set.category_count + 1) // 2
-        investor_count = query_set.category_count - consumer_count
+        for provider in selected_providers:
+            generator = self.category_generators.get(provider)
+            if generator is None:
+                raise ValueError(f"Category generator not configured for provider={provider.value}")
 
-        persona_counts = [
-            (PersonaType.CONSUMER, consumer_count),
-            (PersonaType.INVESTOR, investor_count),
-        ]
+            # Use ceiling division to handle odd counts.
+            consumer_count = (query_set.category_count + 1) // 2
+            investor_count = query_set.category_count - consumer_count
 
-        for persona, count in persona_counts:
-            if count <= 0:
-                continue
+            persona_counts = [
+                (PersonaType.CONSUMER, consumer_count),
+                (PersonaType.INVESTOR, investor_count),
+            ]
 
-            generated = await self.category_gen.generate(profile, count, persona)
+            for persona, count in persona_counts:
+                if count <= 0:
+                    continue
 
-            for i, cat_data in enumerate(generated):
-                category = PipelineCategory(
-                    name=cat_data["name"],
-                    description=cat_data.get("description"),
-                    persona_type=persona,
-                    order_index=len(categories) + 1,
-                    company_profile_id=profile.id,
-                    query_set_id=query_set.id,
-                )
-                self.db.add(category)
-                categories.append(category)
+                generated = await generator.generate(profile, count, persona)
+
+                for cat_data in generated:
+                    category = PipelineCategory(
+                        name=cat_data["name"],
+                        description=cat_data.get("description"),
+                        persona_type=persona,
+                        llm_provider=provider,
+                        order_index=len(categories) + 1,
+                        company_profile_id=profile.id,
+                        query_set_id=query_set.id,
+                    )
+                    self.db.add(category)
+                    categories.append(category)
 
         await self.db.commit()
         logger.info(f"Generated {len(categories)} categories")
@@ -156,12 +167,18 @@ class PipelineOrchestratorService:
         profile: CompanyProfile,
         categories: list[PipelineCategory],
         query_set: QuerySet,
-    ) -> list[ExpandedQuery]:
+    ) -> list[tuple[ExpandedQuery, LLMProvider]]:
         """Expand all categories into queries."""
-        queries = []
+        query_entries: list[tuple[ExpandedQuery, LLMProvider]] = []
 
         for category in categories:
-            query_texts = await self.query_expander.expand(
+            expander = self.query_expanders.get(category.llm_provider)
+            if expander is None:
+                raise ValueError(
+                    f"Query expander not configured for provider={category.llm_provider.value}"
+                )
+
+            query_texts = await expander.expand(
                 profile, category, query_set.queries_per_category
             )
             for i, text in enumerate(query_texts):
@@ -171,49 +188,38 @@ class PipelineOrchestratorService:
                     category_id=category.id,
                 )
                 self.db.add(query)
-                queries.append(query)
+                query_entries.append((query, category.llm_provider))
 
-        # Calculate total expected responses
-        provider_count = len(job.llm_providers)
-        job.total_queries = len(queries) * provider_count
+        # Provider-specific pipeline executes each expanded query with its own provider once.
+        job.total_queries = len(query_entries)
 
         await self.db.commit()
         logger.info(
-            f"Expanded to {len(queries)} queries, "
+            f"Expanded to {len(query_entries)} queries, "
             f"expecting {job.total_queries} total responses"
         )
-        return queries
+        return query_entries
 
     async def _execute_queries(
         self,
         job: PipelineJob,
-        queries: list[ExpandedQuery],
+        query_entries: list[tuple[ExpandedQuery, LLMProvider]],
     ) -> None:
         """Execute all queries with progress tracking."""
-        providers = [LLMProvider(p) for p in job.llm_providers]
-
-        for query in queries:
+        for query, provider in query_entries:
             query.status = ExpandedQueryStatus.EXECUTING
             await self.db.commit()
 
-            has_success = False
-            for provider in providers:
-                response = await self.executor.execute_single(query, provider, job.id)
-                self.db.add(response)
+            response = await self.executor.execute_single(query, provider, job.id)
+            self.db.add(response)
 
-                if response.error_message:
-                    job.failed_queries += 1
-                else:
-                    job.completed_queries += 1
-                    has_success = True
+            if response.error_message:
+                job.failed_queries += 1
+                query.status = ExpandedQueryStatus.FAILED
+            else:
+                job.completed_queries += 1
+                query.status = ExpandedQueryStatus.COMPLETED
 
-                await self.db.commit()
-
-            query.status = (
-                ExpandedQueryStatus.COMPLETED
-                if has_success
-                else ExpandedQueryStatus.FAILED
-            )
             await self.db.commit()
 
     async def _complete_job(self, job: PipelineJob) -> None:

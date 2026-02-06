@@ -133,6 +133,7 @@ class CategoryResponse(BaseModel):
     id: int
     name: str
     description: str | None
+    llm_provider: str
     persona_type: str
     order_index: int
     query_count: int
@@ -253,19 +254,23 @@ async def start_pipeline(
             return settings.OPENAI_API_KEY
         raise ValueError(f"Unknown provider: {provider}")
 
-    generator_llm = LLMFactory.create(LLMProvider.GEMINI, settings.GEMINI_API_KEY)
-
     providers_dict = {
         LLMProvider(p): LLMFactory.create(LLMProvider(p), _get_api_key(LLMProvider(p)))
         for p in request.llm_providers
     }
 
-    category_gen = CategoryGeneratorService(generator_llm)
-    query_expander = QueryExpanderService(generator_llm)
+    category_generators = {
+        provider: CategoryGeneratorService(llm)
+        for provider, llm in providers_dict.items()
+    }
+    query_expanders = {
+        provider: QueryExpanderService(llm)
+        for provider, llm in providers_dict.items()
+    }
     query_executor = QueryExecutorService(providers_dict)
     bg_db = async_session_maker()
     orchestrator = PipelineOrchestratorService(
-        bg_db, category_gen, query_expander, query_executor
+        bg_db, category_generators, query_expanders, query_executor
     )
 
     # FIX #7: Pass all required arguments to orchestrator.start_pipeline
@@ -458,6 +463,7 @@ async def get_categories(
     result = await db.execute(
         select(PipelineCategory)
         .where(PipelineCategory.query_set_id == job.query_set_id)
+        .where(PipelineCategory.llm_provider.in_([LLMProvider(p) for p in job.llm_providers]))
         .options(selectinload(PipelineCategory.expanded_queries))
         .order_by(PipelineCategory.order_index)
     )
@@ -469,6 +475,7 @@ async def get_categories(
                 id=c.id,
                 name=c.name,
                 description=c.description,
+                llm_provider=c.llm_provider.value,
                 persona_type=c.persona_type.value,
                 order_index=c.order_index,
                 query_count=len(c.expanded_queries),
@@ -507,6 +514,7 @@ async def get_queries(
         select(ExpandedQuery)
         .join(PipelineCategory, ExpandedQuery.category_id == PipelineCategory.id)
         .where(PipelineCategory.query_set_id == job.query_set_id)
+        .where(PipelineCategory.llm_provider.in_([LLMProvider(p) for p in job.llm_providers]))
         .options(selectinload(ExpandedQuery.raw_responses))
     )
 
@@ -649,19 +657,23 @@ async def rerun_query_set(
             return settings.OPENAI_API_KEY
         raise ValueError(f"Unknown provider: {provider}")
 
-    generator_llm = LLMFactory.create(LLMProvider.GEMINI, settings.GEMINI_API_KEY)
-
     providers_dict = {
         LLMProvider(p): LLMFactory.create(LLMProvider(p), _get_api_key(LLMProvider(p)))
         for p in request.llm_providers
     }
 
-    category_gen = CategoryGeneratorService(generator_llm)
-    query_expander = QueryExpanderService(generator_llm)
+    category_generators = {
+        provider: CategoryGeneratorService(llm)
+        for provider, llm in providers_dict.items()
+    }
+    query_expanders = {
+        provider: QueryExpanderService(llm)
+        for provider, llm in providers_dict.items()
+    }
     query_executor = QueryExecutorService(providers_dict)
     bg_db = async_session_maker()
     orchestrator = PipelineOrchestratorService(
-        bg_db, category_gen, query_expander, query_executor
+        bg_db, category_generators, query_expanders, query_executor
     )
 
     # Start background execution with is_rerun=True (skips category/query generation)
