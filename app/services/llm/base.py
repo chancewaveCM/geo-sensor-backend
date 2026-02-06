@@ -5,13 +5,8 @@ F4: LLM Service with Gemini + OpenAI providers
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
 
-
-class LLMProvider(Enum):
-    """Supported LLM providers"""
-    GEMINI = "gemini"
-    OPENAI = "openai"
+from app.models.enums import LLMProvider
 
 
 @dataclass

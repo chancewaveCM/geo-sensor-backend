@@ -1,7 +1,7 @@
 """Company Profile model."""
 
-from sqlalchemy import Column, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
 
@@ -20,6 +20,7 @@ class CompanyProfile(Base, TimestampMixin):
     competitors = Column(Text)
     unique_value = Column(Text)
     website_url = Column(String(500))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     owner_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -29,6 +30,21 @@ class CompanyProfile(Base, TimestampMixin):
     project = relationship("Project", backref="company_profiles")
     generated_queries = relationship(
         "GeneratedQuery",
+        back_populates="company_profile",
+        cascade="all, delete-orphan",
+    )
+    query_sets = relationship(
+        "QuerySet",
+        back_populates="company_profile",
+        cascade="all, delete-orphan",
+    )
+    pipeline_categories = relationship(
+        "PipelineCategory",
+        back_populates="company_profile",
+        cascade="all, delete-orphan",
+    )
+    pipeline_jobs = relationship(
+        "PipelineJob",
         back_populates="company_profile",
         cascade="all, delete-orphan",
     )

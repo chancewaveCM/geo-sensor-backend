@@ -1,5 +1,14 @@
-import pytest
-from app.models import User, Project, Brand, Query, Response, Citation, QueryStatus, LLMProvider, MatchType
+from app.models import (
+    Brand,
+    Citation,
+    LLMProvider,
+    MatchType,
+    Project,
+    Query,
+    QueryStatus,
+    Response,
+    User,
+)
 
 
 def test_user_model_attributes():

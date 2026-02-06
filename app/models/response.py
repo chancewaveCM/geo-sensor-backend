@@ -1,19 +1,14 @@
-import enum
 from typing import TYPE_CHECKING
 
 from sqlalchemy import JSON, Enum, Float, ForeignKey, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+from app.models.enums import LLMProvider
 
 if TYPE_CHECKING:
     from app.models.citation import Citation
     from app.models.query import Query
-
-
-class LLMProvider(str, enum.Enum):
-    OPENAI = "openai"
-    GEMINI = "gemini"
 
 
 class Response(Base, TimestampMixin):

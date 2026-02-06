@@ -1,6 +1,7 @@
 """Tests for Sentiment Analyzer (F6)"""
 
 import pytest
+
 from app.services.analysis.sentiment import SentimentAnalyzer, SentimentType
 
 

@@ -1,7 +1,8 @@
 """Tests for Brand Matching Engine (F5)"""
 
 import pytest
-from app.services.analysis.brand_matcher import BrandMatcher, Brand, MatchType
+
+from app.services.analysis.brand_matcher import Brand, BrandMatcher, MatchType
 
 
 @pytest.fixture

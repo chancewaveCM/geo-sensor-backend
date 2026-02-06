@@ -2,7 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
 
-from app.models.response import LLMProvider
+from app.models.enums import LLMProvider
 
 
 class ResponseBase(BaseModel):

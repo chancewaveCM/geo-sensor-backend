@@ -1,15 +1,21 @@
 import time
+from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
+from sqlalchemy import update
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.logging import get_logger, set_correlation_id
+from app.db.session import async_session_maker
+from app.models.enums import PipelineStatus
+from app.models.pipeline_job import PipelineJob
 
 logger = get_logger(__name__)
 
@@ -40,6 +46,37 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             raise
 
 
+STUCK_STATUSES = [
+    PipelineStatus.PENDING,
+    PipelineStatus.GENERATING_CATEGORIES,
+    PipelineStatus.EXPANDING_QUERIES,
+    PipelineStatus.EXECUTING_QUERIES,
+]
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Mark stuck pipeline jobs as FAILED on startup."""
+    async with async_session_maker() as db:
+        result = await db.execute(
+            update(PipelineJob)
+            .where(PipelineJob.status.in_(STUCK_STATUSES))
+            .values(
+                status=PipelineStatus.FAILED,
+                error_message="Server restarted while job was running",
+                completed_at=datetime.utcnow(),
+            )
+            .returning(PipelineJob.id)
+        )
+        failed_ids = [row[0] for row in result.fetchall()]
+        if failed_ids:
+            await db.commit()
+            logger.info(f"Marked {len(failed_ids)} stuck jobs as FAILED: {failed_ids}")
+        else:
+            logger.info("No stuck pipeline jobs found on startup")
+    yield
+
+
 limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
@@ -48,6 +85,7 @@ app = FastAPI(
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.state.limiter = limiter

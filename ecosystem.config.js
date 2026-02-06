@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'geo-backend',
       script: 'python',
-      args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8000',
+      args: '-m uvicorn app.main:app --host 0.0.0.0 --port 8765',
       cwd: __dirname,
       env: {
         ENVIRONMENT: 'development',

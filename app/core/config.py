@@ -46,14 +46,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./geo_sensor.db"
 
-    # CORS
+    # CORS - GEO Sensor uses port 3765 (frontend) / 8765 (backend)
     CORS_ORIGINS: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:3002",
-        "http://localhost:3003",
-        "http://localhost:8000",
-        "http://localhost:8100",
+        "http://localhost:3765",  # GEO Sensor Frontend (primary)
+        "http://localhost:3000",  # fallback for other envs
+        "http://localhost:8765",  # GEO Sensor Backend
     ]
 
     # LLM Providers
@@ -62,8 +59,8 @@ class Settings(BaseSettings):
 
     # LLM Settings
     DEFAULT_LLM_PROVIDER: str = "gemini"
-    GEMINI_MODEL: str = "gemini-2.0-flash"
-    OPENAI_MODEL: str = "gpt-4o-mini"
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+    OPENAI_MODEL: str = "gpt-5-nano"
 
     # Analysis Settings
     FUZZY_MATCH_THRESHOLD: float = 0.8

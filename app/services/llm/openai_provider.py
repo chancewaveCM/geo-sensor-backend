@@ -23,7 +23,7 @@ class OpenAIService(BaseLLMService):
 
     provider = LLMProvider.OPENAI
 
-    def __init__(self, api_key: str, model: str = "gpt-4o-mini"):
+    def __init__(self, api_key: str, model: str = "gpt-5-nano"):
         self.api_key = api_key
         self.model = model
         self._client = None
@@ -59,7 +59,7 @@ class OpenAIService(BaseLLMService):
             model=self.model,
             messages=messages,
             temperature=temperature,
-            max_tokens=max_tokens,
+            max_completion_tokens=max_tokens,
         )
 
         latency_ms = (time.time() - start_time) * 1000

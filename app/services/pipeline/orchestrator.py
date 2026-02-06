@@ -36,9 +36,9 @@ class PipelineOrchestratorService:
 
     async def start_pipeline(
         self,
-        job: PipelineJob,
-        company_profile: CompanyProfile,
-        query_set: QuerySet,
+        job_id: int,
+        company_profile_id: int,
+        query_set_id: int,
         is_rerun: bool = False,
     ) -> None:
         """
@@ -48,7 +48,19 @@ class PipelineOrchestratorService:
         3. Execute queries against LLM providers
         4. Store normalized responses
         """
+        job: PipelineJob | None = None
+
         try:
+            job = await self.db.get(PipelineJob, job_id)
+            company_profile = await self.db.get(CompanyProfile, company_profile_id)
+            query_set = await self.db.get(QuerySet, query_set_id)
+
+            if not job or not company_profile or not query_set:
+                raise ValueError(
+                    f"Pipeline resources not found: "
+                    f"job={job_id}, profile={company_profile_id}, query_set={query_set_id}"
+                )
+
             job.started_at = datetime.utcnow()
 
             if is_rerun:
@@ -85,9 +97,12 @@ class PipelineOrchestratorService:
             await self._complete_job(job)
 
         except Exception as e:
-            logger.exception(f"Pipeline failed for job {job.id}")
-            await self._fail_job(job, str(e))
+            logger.exception(f"Pipeline failed for job {job_id}")
+            if job is not None:
+                await self._fail_job(job, str(e))
             raise
+        finally:
+            await self.db.close()
 
     async def _update_status(self, job: PipelineJob, status: PipelineStatus) -> None:
         """Update job status and commit."""

@@ -37,5 +37,11 @@ class CompanyProfileResponse(CompanyProfileBase):
 
     id: int
     owner_id: int
+    is_active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class CompanyProfileListResponse(BaseModel):
+    items: list[CompanyProfileResponse]
+    total: int

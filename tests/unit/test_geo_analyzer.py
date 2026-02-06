@@ -1,9 +1,8 @@
 """Tests for GEO Optimization Analyzer (F9)"""
 
 import pytest
-from app.services.optimization.geo_analyzer import (
-    GEOOptimizationAnalyzer, Grade, TriggerType
-)
+
+from app.services.optimization.geo_analyzer import GEOOptimizationAnalyzer, Grade, TriggerType
 
 
 @pytest.fixture

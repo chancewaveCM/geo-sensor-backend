@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
 from app.models.company_profile import CompanyProfile
+from app.models.enums import LLMProvider
 from app.models.generated_query import GeneratedQuery, GeneratedQueryStatus, QueryCategory
 from app.schemas.generated_query import (
     BulkUpdateRequest,
@@ -13,7 +14,6 @@ from app.schemas.generated_query import (
     GeneratedQueryUpdate,
     GenerateQueriesRequest,
 )
-from app.services.llm.base import LLMProvider
 from app.services.llm.factory import LLMFactory
 
 router = APIRouter(prefix="/generated-queries", tags=["generated-queries"])

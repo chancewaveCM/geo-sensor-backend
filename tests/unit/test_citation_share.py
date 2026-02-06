@@ -1,8 +1,9 @@
 """Tests for Citation Share Calculator (F8)"""
 
 import pytest
-from app.services.analysis.citation_share import CitationShareCalculator
+
 from app.services.analysis.brand_matcher import BrandMatch, MatchType
+from app.services.analysis.citation_share import CitationShareCalculator
 
 
 @pytest.fixture

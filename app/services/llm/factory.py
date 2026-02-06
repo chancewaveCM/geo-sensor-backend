@@ -39,9 +39,9 @@ class LLMFactory:
             return cls._instances[cache_key]
 
         if provider == LLMProvider.GEMINI:
-            instance = GeminiService(api_key, model or "gemini-1.5-flash")
+            instance = GeminiService(api_key, model or "gemini-2.5-flash")
         elif provider == LLMProvider.OPENAI:
-            instance = OpenAIService(api_key, model or "gpt-4o-mini")
+            instance = OpenAIService(api_key, model or "gpt-5-nano")
         else:
             raise ValueError(f"Unknown provider: {provider}")
 

@@ -1,12 +1,13 @@
 """Company Profile endpoints."""
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.api.deps import CurrentUser, DbSession
 from app.models.company_profile import CompanyProfile
 from app.schemas.company_profile import (
     CompanyProfileCreate,
+    CompanyProfileListResponse,
     CompanyProfileResponse,
     CompanyProfileUpdate,
 )
@@ -28,22 +29,35 @@ async def create_company_profile(
     return profile
 
 
-@router.get("/", response_model=list[CompanyProfileResponse])
+@router.get("/", response_model=CompanyProfileListResponse)
 async def list_company_profiles(
     db: DbSession,
     current_user: CurrentUser,
     skip: int = 0,
     limit: int = 100,
-) -> list[CompanyProfile]:
+    include_inactive: bool = False,
+) -> dict:
     """List company profiles for current user."""
-    result = await db.execute(
-        select(CompanyProfile)
-        .where(CompanyProfile.owner_id == current_user.id)
-        .offset(skip)
-        .limit(limit)
-        .order_by(CompanyProfile.created_at.desc())
+    query = select(CompanyProfile).where(
+        CompanyProfile.owner_id == current_user.id
     )
-    return list(result.scalars().all())
+
+    if not include_inactive:
+        query = query.where(CompanyProfile.is_active)
+
+    # Count total
+    count_result = await db.execute(
+        select(func.count()).select_from(query.subquery())
+    )
+    total = count_result.scalar() or 0
+
+    # Get items with pagination
+    result = await db.execute(
+        query.offset(skip).limit(limit).order_by(CompanyProfile.created_at.desc())
+    )
+    items = list(result.scalars().all())
+
+    return {"items": items, "total": total}
 
 
 @router.get("/{profile_id}", response_model=CompanyProfileResponse)
@@ -103,7 +117,7 @@ async def delete_company_profile(
     db: DbSession,
     current_user: CurrentUser,
 ) -> None:
-    """Delete a company profile."""
+    """Delete a company profile (soft delete)."""
     result = await db.execute(
         select(CompanyProfile).where(
             CompanyProfile.id == profile_id,
@@ -117,5 +131,29 @@ async def delete_company_profile(
             detail="Company profile not found",
         )
 
-    await db.delete(profile)
+    profile.is_active = False
     await db.commit()
+
+
+@router.put("/{profile_id}/reactivate", response_model=CompanyProfileResponse)
+async def reactivate_company_profile(
+    profile_id: int,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> CompanyProfile:
+    """Reactivate a deactivated company profile."""
+    result = await db.execute(
+        select(CompanyProfile).where(
+            CompanyProfile.id == profile_id,
+            CompanyProfile.owner_id == current_user.id,
+        )
+    )
+    profile = result.scalar_one_or_none()
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Company profile not found")
+
+    profile.is_active = True
+    await db.commit()
+    await db.refresh(profile)
+    return profile

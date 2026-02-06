@@ -11,9 +11,10 @@ from sqlalchemy.orm import selectinload
 from app.api.deps import CurrentUser, DbSession
 from app.models.brand import Brand
 from app.models.citation import Citation
+from app.models.enums import LLMProvider
 from app.models.project import Project
 from app.models.query import Query, QueryStatus
-from app.models.response import LLMProvider, Response
+from app.models.response import Response
 from app.services.llm.constants import DEFAULT_MODELS
 
 logger = logging.getLogger(__name__)

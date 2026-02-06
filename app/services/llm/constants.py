@@ -16,6 +16,6 @@ HEALTH_CHECK_MAX_TOKENS = 10
 
 # Default models per provider
 DEFAULT_MODELS = {
-    "gemini": "gemini-2.0-flash",
-    "openai": "gpt-4o-mini",
+    "gemini": "gemini-2.5-flash",
+    "openai": "gpt-5-nano",
 }

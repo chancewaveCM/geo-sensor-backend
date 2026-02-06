@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import get_current_user, get_db
+from app.core.config import settings
+from app.db.session import async_session_maker
 from app.models.company_profile import CompanyProfile
 from app.models.enums import LLMProvider, PipelineStatus
 from app.models.expanded_query import ExpandedQuery
@@ -32,7 +34,7 @@ router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
 class StartPipelineRequest(BaseModel):
     company_profile_id: int
-    category_count: int = Field(default=10, ge=2, le=20)
+    category_count: int = Field(default=10, ge=1, le=20)
     queries_per_category: int = Field(default=10, ge=1, le=20)
     llm_providers: list[str] = Field(
         default=["gemini", "openai"],
@@ -244,26 +246,42 @@ async def start_pipeline(
     await db.refresh(job)
 
     # Build services
-    llm_factory = LLMFactory()
-    generator_llm = llm_factory.create(LLMProvider.GEMINI)  # Use Gemini for generation
+    def _get_api_key(provider: LLMProvider) -> str:
+        if provider == LLMProvider.GEMINI:
+            return settings.GEMINI_API_KEY
+        elif provider == LLMProvider.OPENAI:
+            return settings.OPENAI_API_KEY
+        raise ValueError(f"Unknown provider: {provider}")
+
+    generator_llm = LLMFactory.create(LLMProvider.GEMINI, settings.GEMINI_API_KEY)
 
     providers_dict = {
-        LLMProvider(p): llm_factory.create(LLMProvider(p))
+        LLMProvider(p): LLMFactory.create(LLMProvider(p), _get_api_key(LLMProvider(p)))
         for p in request.llm_providers
     }
 
     category_gen = CategoryGeneratorService(generator_llm)
     query_expander = QueryExpanderService(generator_llm)
     query_executor = QueryExecutorService(providers_dict)
+    bg_db = async_session_maker()
     orchestrator = PipelineOrchestratorService(
-        db, category_gen, query_expander, query_executor
+        bg_db, category_gen, query_expander, query_executor
     )
 
     # FIX #7: Pass all required arguments to orchestrator.start_pipeline
-    await BackgroundJobManager.start_job(
-        job.id,
-        orchestrator.start_pipeline(job, profile, query_set, is_rerun=False),
-    )
+    try:
+        await BackgroundJobManager.start_job(
+            job.id,
+            orchestrator.start_pipeline(
+                job_id=job.id,
+                company_profile_id=profile.id,
+                query_set_id=query_set.id,
+                is_rerun=False,
+            ),
+        )
+    except Exception:
+        await bg_db.close()
+        raise
 
     estimated = (
         request.category_count
@@ -596,6 +614,11 @@ async def rerun_query_set(
         )
     )
     profile = profile_result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Company profile not found",
+        )
 
     # Validate providers
     valid_providers = {p.value for p in LLMProvider}
@@ -619,26 +642,42 @@ async def rerun_query_set(
     await db.refresh(job)
 
     # Build services
-    llm_factory = LLMFactory()
-    generator_llm = llm_factory.create(LLMProvider.GEMINI)
+    def _get_api_key(provider: LLMProvider) -> str:
+        if provider == LLMProvider.GEMINI:
+            return settings.GEMINI_API_KEY
+        elif provider == LLMProvider.OPENAI:
+            return settings.OPENAI_API_KEY
+        raise ValueError(f"Unknown provider: {provider}")
+
+    generator_llm = LLMFactory.create(LLMProvider.GEMINI, settings.GEMINI_API_KEY)
 
     providers_dict = {
-        LLMProvider(p): llm_factory.create(LLMProvider(p))
+        LLMProvider(p): LLMFactory.create(LLMProvider(p), _get_api_key(LLMProvider(p)))
         for p in request.llm_providers
     }
 
     category_gen = CategoryGeneratorService(generator_llm)
     query_expander = QueryExpanderService(generator_llm)
     query_executor = QueryExecutorService(providers_dict)
+    bg_db = async_session_maker()
     orchestrator = PipelineOrchestratorService(
-        db, category_gen, query_expander, query_executor
+        bg_db, category_gen, query_expander, query_executor
     )
 
     # Start background execution with is_rerun=True (skips category/query generation)
-    await BackgroundJobManager.start_job(
-        job.id,
-        orchestrator.start_pipeline(job, profile, query_set, is_rerun=True),
-    )
+    try:
+        await BackgroundJobManager.start_job(
+            job.id,
+            orchestrator.start_pipeline(
+                job_id=job.id,
+                company_profile_id=profile.id,
+                query_set_id=query_set.id,
+                is_rerun=True,
+            ),
+        )
+    except Exception:
+        await bg_db.close()
+        raise
 
     estimated = (
         query_set.category_count

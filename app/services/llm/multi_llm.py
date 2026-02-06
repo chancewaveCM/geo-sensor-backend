@@ -98,7 +98,7 @@ class MultiLLMService:
 
             return provider, response
 
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.error(f"Provider {provider.value} timed out after {timeout}s")
             return provider, TimeoutError(f"Request timed out after {timeout}s")
         except Exception as e:
