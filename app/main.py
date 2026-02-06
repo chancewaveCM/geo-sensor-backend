@@ -1,3 +1,4 @@
+import asyncio
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -16,6 +17,7 @@ from app.core.logging import get_logger, set_correlation_id
 from app.db.session import async_session_maker
 from app.models.enums import PipelineStatus
 from app.models.pipeline_job import PipelineJob
+from app.services.campaign.scheduler import get_scheduler
 
 logger = get_logger(__name__)
 
@@ -56,7 +58,7 @@ STUCK_STATUSES = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Mark stuck pipeline jobs as FAILED on startup."""
+    """Mark stuck pipeline jobs as FAILED on startup and start scheduler."""
     async with async_session_maker() as db:
         result = await db.execute(
             update(PipelineJob)
@@ -74,7 +76,22 @@ async def lifespan(app: FastAPI):
             logger.info(f"Marked {len(failed_ids)} stuck jobs as FAILED: {failed_ids}")
         else:
             logger.info("No stuck pipeline jobs found on startup")
+
+    # Start campaign scheduler in background
+    scheduler = get_scheduler(poll_interval_seconds=300)  # 5 min interval
+    scheduler_task = asyncio.create_task(scheduler.start())
+    logger.info("Campaign scheduler started")
+
     yield
+
+    # Shutdown scheduler
+    scheduler.stop()
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Campaign scheduler stopped")
 
 
 limiter = Limiter(key_func=get_remote_address)
@@ -96,7 +113,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Accept", "X-Correlation-ID"],
 )
 

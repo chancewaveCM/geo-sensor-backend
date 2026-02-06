@@ -20,8 +20,10 @@ from app.core.constants import (
 )
 from app.core.security import verify_token
 from app.db.session import get_db
+from app.models.enums import WorkspaceRole
 from app.models.project import Project
 from app.models.user import User
+from app.models.workspace import WorkspaceMember
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
@@ -101,6 +103,45 @@ def get_pagination_params(
 
 
 Pagination = Annotated[PaginationParams, Depends(get_pagination_params)]
+
+
+# Workspace access verification
+async def get_workspace_member(
+    workspace_id: int,
+    db: Annotated[AsyncSession, Depends(get_db)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
+) -> WorkspaceMember:
+    """Verify current user is a member of the workspace and return membership."""
+    result = await db.execute(
+        select(WorkspaceMember).where(
+            WorkspaceMember.workspace_id == workspace_id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+    )
+    member = result.scalar_one_or_none()
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a member of this workspace",
+        )
+    return member
+
+
+async def get_workspace_admin(
+    member: Annotated[WorkspaceMember, Depends(get_workspace_member)],
+) -> WorkspaceMember:
+    """Verify current user is an ADMIN of the workspace."""
+    if member.role != WorkspaceRole.ADMIN.value:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required for this workspace",
+        )
+    return member
+
+
+# Workspace type aliases
+WorkspaceMemberDep = Annotated[WorkspaceMember, Depends(get_workspace_member)]
+WorkspaceAdminDep = Annotated[WorkspaceMember, Depends(get_workspace_admin)]
 
 
 # Project access verification

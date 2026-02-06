@@ -1,14 +1,41 @@
 from app.models.base import Base, TimestampMixin
 from app.models.brand import Brand
+from app.models.campaign import (
+    Campaign,
+    CampaignCompany,
+    CampaignRun,
+    IntentCluster,
+    PromptTemplate,
+    QueryDefinition,
+    QueryVersion,
+    RunResponse,
+)
 from app.models.citation import Citation, MatchType
 from app.models.company_profile import CompanyProfile
 from app.models.enums import (
+    CampaignStatus,
+    ComparisonType,
     ExpandedQueryStatus,
+    LabelSeverity,
+    LabelType,
     LLMProvider,
+    OperationStatus,
+    OperationType,
     PersonaType,
     PipelineStatus,
+    QueryType,
+    ReviewType,
+    RunStatus,
+    TriggerType,
+    WorkspaceRole,
 )
 from app.models.expanded_query import ExpandedQuery
+from app.models.gallery import (
+    CitationReview,
+    ComparisonSnapshot,
+    OperationLog,
+    ResponseLabel,
+)
 from app.models.generated_query import (
     GeneratedQuery,
     GeneratedQueryStatus,
@@ -21,7 +48,9 @@ from app.models.query import Query, QueryStatus
 from app.models.query_set import QuerySet
 from app.models.raw_llm_response import RawLLMResponse
 from app.models.response import Response
+from app.models.run_citation import RunCitation
 from app.models.user import User
+from app.models.workspace import Workspace, WorkspaceMember
 
 __all__ = [
     "Base",
@@ -49,4 +78,35 @@ __all__ = [
     "PersonaType",
     "PipelineStatus",
     "ExpandedQueryStatus",
+    # Workspace models
+    "Workspace",
+    "WorkspaceMember",
+    "WorkspaceRole",
+    # Campaign models
+    "Campaign",
+    "CampaignCompany",
+    "CampaignRun",
+    "IntentCluster",
+    "PromptTemplate",
+    "QueryDefinition",
+    "QueryVersion",
+    "RunResponse",
+    "RunCitation",
+    # Campaign enums
+    "CampaignStatus",
+    "QueryType",
+    "TriggerType",
+    "RunStatus",
+    # Gallery models
+    "ResponseLabel",
+    "CitationReview",
+    "ComparisonSnapshot",
+    "OperationLog",
+    # Gallery enums
+    "LabelType",
+    "LabelSeverity",
+    "ReviewType",
+    "ComparisonType",
+    "OperationType",
+    "OperationStatus",
 ]

@@ -1,5 +1,6 @@
 """Authentication endpoints."""
 
+import re
 from datetime import timedelta
 from typing import Annotated
 
@@ -11,6 +12,8 @@ from slowapi.util import get_remote_address
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
 from app.core.security import create_access_token
+from app.models.enums import WorkspaceRole
+from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.token import Token
 from app.schemas.user import UserCreate, UserResponse
 from app.services import user_service
@@ -64,6 +67,26 @@ async def register(
         )
 
     user = await user_service.create_user(db, user_in)
+
+    # Auto-create default workspace for new user
+    ws_name = f"{user.full_name or user.email.split('@')[0]}'s Workspace"
+    ws_slug = re.sub(r'[^\w\s-]', '', ws_name.lower().strip())
+    ws_slug = re.sub(r'[\s_]+', '-', ws_slug)
+    ws_slug = re.sub(r'-+', '-', ws_slug).strip('-')
+
+    workspace = Workspace(name=ws_name, slug=ws_slug)
+    db.add(workspace)
+    await db.flush()  # Get workspace.id
+
+    member = WorkspaceMember(
+        workspace_id=workspace.id,
+        user_id=user.id,
+        role=WorkspaceRole.ADMIN.value,
+    )
+    db.add(member)
+    await db.commit()
+    await db.refresh(user)
+
     return UserResponse.model_validate(user)
 
 
