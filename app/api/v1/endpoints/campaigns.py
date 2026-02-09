@@ -1,9 +1,12 @@
 """Campaign management endpoints."""
 
+import csv
+import io
 import json
 
 from fastapi import APIRouter, HTTPException, status
-from sqlalchemy import func, select
+from fastapi.responses import StreamingResponse
+from sqlalchemy import Float, Integer, func, select
 
 from app.api.deps import (
     CurrentUser,
@@ -17,11 +20,16 @@ from app.models.campaign import (
     CampaignCompany,
     CampaignRun,
     QueryDefinition,
+    QueryVersion,
     RunResponse,
 )
 from app.models.company_profile import CompanyProfile
 from app.models.enums import CampaignStatus, RunStatus, TriggerType
+from app.models.insight import Insight
+from app.models.run_citation import RunCitation
 from app.schemas.campaign import (
+    BrandRankingItem,
+    BrandRankingResponse,
     CampaignCompanyCreate,
     CampaignCompanyResponse,
     CampaignCompanyUpdate,
@@ -32,8 +40,15 @@ from app.schemas.campaign import (
     CampaignRunResponse,
     CampaignSummaryResponse,
     CampaignUpdate,
+    CitationShareResponse,
+    GEOScoreSummaryResponse,
+    InsightResponse,
+    ProviderComparisonResponse,
+    ProviderMetrics,
+    TimeseriesDataPoint,
     TimeseriesResponse,
 )
+from app.services.content.insight_engine import InsightEngine
 
 router = APIRouter(prefix="/workspaces/{workspace_id}/campaigns", tags=["campaigns"])
 
@@ -548,8 +563,96 @@ async def unlink_campaign_company(
 
 
 # ---------------------------------------------------------------------------
-# Timeseries & Summary (stubs)
+# Analytics Endpoints
 # ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{campaign_id}/citation-share",
+    response_model=CitationShareResponse,
+)
+async def get_citation_share(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> CitationShareResponse:
+    """Get citation share breakdown for a campaign."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    # Total citations count
+    total_cit_result = await db.execute(
+        select(func.count(RunCitation.id))
+        .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.campaign_id == campaign_id)
+    )
+    total_citations = total_cit_result.scalar() or 0
+
+    # Target brand citations count
+    target_cit_result = await db.execute(
+        select(func.count(RunCitation.id))
+        .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(
+            CampaignRun.campaign_id == campaign_id,
+            RunCitation.is_target_brand.is_(True),
+        )
+    )
+    target_brand_citations = target_cit_result.scalar() or 0
+
+    # Overall citation share
+    overall_citation_share = (
+        target_brand_citations / total_citations if total_citations > 0 else 0.0
+    )
+
+    # By provider
+    by_provider_result = await db.execute(
+        select(
+            RunResponse.llm_provider,
+            func.count(RunCitation.id).label("total"),
+            func.sum(func.cast(RunCitation.is_target_brand, Integer)).label("target"),
+        )
+        .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.campaign_id == campaign_id)
+        .group_by(RunResponse.llm_provider)
+    )
+    by_provider = {}
+    for row in by_provider_result:
+        provider_share = row.target / row.total if row.total > 0 else 0.0
+        by_provider[row.llm_provider] = provider_share
+
+    # By brand
+    by_brand_result = await db.execute(
+        select(
+            RunCitation.cited_brand,
+            RunCitation.is_target_brand,
+            func.count(RunCitation.id).label("count"),
+        )
+        .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.campaign_id == campaign_id)
+        .group_by(RunCitation.cited_brand, RunCitation.is_target_brand)
+    )
+    by_brand = []
+    for row in by_brand_result:
+        brand_share = row.count / total_citations if total_citations > 0 else 0.0
+        by_brand.append({
+            "brand": row.cited_brand,
+            "share": brand_share,
+            "count": row.count,
+            "is_target_brand": row.is_target_brand,
+        })
+
+    return CitationShareResponse(
+        campaign_id=campaign_id,
+        overall_citation_share=overall_citation_share,
+        total_citations=total_citations,
+        target_brand_citations=target_brand_citations,
+        by_provider=by_provider,
+        by_brand=by_brand,
+    )
 
 
 @router.get(
@@ -563,15 +666,267 @@ async def get_campaign_timeseries(
     member: WorkspaceMemberDep,
     brand_name: str = "target",
 ) -> TimeseriesResponse:
-    """Get citation timeseries for a campaign. Stub — returns empty data."""
+    """Get citation timeseries for a campaign."""
     await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    # Get completed runs ordered by time
+    runs_result = await db.execute(
+        select(CampaignRun)
+        .where(
+            CampaignRun.campaign_id == campaign_id,
+            CampaignRun.status == RunStatus.COMPLETED.value,
+        )
+        .order_by(CampaignRun.run_number)
+    )
+    runs = runs_result.scalars().all()
+
+    time_series = []
+    for run in runs:
+        # Count citations for this run
+        total_cit_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .where(RunResponse.campaign_run_id == run.id)
+        )
+        total_citations = total_cit_result.scalar() or 0
+
+        # Count target brand citations
+        target_cit_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .where(
+                RunResponse.campaign_run_id == run.id,
+                RunCitation.is_target_brand.is_(True),
+            )
+        )
+        brand_citations = target_cit_result.scalar() or 0
+
+        citation_share_overall = (
+            brand_citations / total_citations if total_citations > 0 else 0.0
+        )
+
+        # By provider for this run
+        by_provider_result = await db.execute(
+            select(
+                RunResponse.llm_provider,
+                func.count(RunCitation.id).label("total"),
+                func.sum(func.cast(RunCitation.is_target_brand, Integer)).label("target"),
+            )
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .where(RunResponse.campaign_run_id == run.id)
+            .group_by(RunResponse.llm_provider)
+        )
+        citation_share_by_provider = {}
+        for row in by_provider_result:
+            provider_share = row.target / row.total if row.total > 0 else 0.0
+            citation_share_by_provider[row.llm_provider] = provider_share
+
+        time_series.append(
+            TimeseriesDataPoint(
+                run_id=run.id,
+                timestamp=run.started_at or run.created_at,
+                citation_share_overall=citation_share_overall,
+                citation_share_by_provider=citation_share_by_provider,
+                total_citations=total_citations,
+                brand_citations=brand_citations,
+            )
+        )
 
     return TimeseriesResponse(
         campaign_id=campaign_id,
         brand_name=brand_name,
-        time_series=[],
+        time_series=time_series,
         annotations=[],
     )
+
+
+@router.get(
+    "/{campaign_id}/brand-ranking",
+    response_model=BrandRankingResponse,
+)
+async def get_brand_ranking(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> BrandRankingResponse:
+    """Get brands ranked by citation frequency."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    # Total citations
+    total_cit_result = await db.execute(
+        select(func.count(RunCitation.id))
+        .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.campaign_id == campaign_id)
+    )
+    total_citations = total_cit_result.scalar() or 0
+
+    # Group by brand
+    brand_result = await db.execute(
+        select(
+            RunCitation.cited_brand,
+            RunCitation.is_target_brand,
+            func.count(RunCitation.id).label("count"),
+        )
+        .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.campaign_id == campaign_id)
+        .group_by(RunCitation.cited_brand, RunCitation.is_target_brand)
+        .order_by(func.count(RunCitation.id).desc())
+    )
+
+    rankings = []
+    rank = 1
+    for row in brand_result:
+        citation_share = row.count / total_citations if total_citations > 0 else 0.0
+        rankings.append(
+            BrandRankingItem(
+                rank=rank,
+                brand=row.cited_brand,
+                citation_count=row.count,
+                citation_share=citation_share,
+                is_target_brand=row.is_target_brand,
+            )
+        )
+        rank += 1
+
+    return BrandRankingResponse(
+        campaign_id=campaign_id,
+        rankings=rankings,
+        total_citations=total_citations,
+    )
+
+
+@router.get(
+    "/{campaign_id}/geo-score-summary",
+    response_model=GEOScoreSummaryResponse,
+)
+async def get_geo_score_summary(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> GEOScoreSummaryResponse:
+    """Get GEO score summary (placeholder using proxy metrics)."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    # Overall proxy: avg(citation_count / word_count)
+    overall_result = await db.execute(
+        select(
+            func.avg(
+                func.cast(RunResponse.citation_count, Float) /
+                func.nullif(func.cast(RunResponse.word_count, Float), 0)
+            ).label("avg_geo_score"),
+            func.count(RunResponse.id).label("total_runs"),
+        )
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(
+            CampaignRun.campaign_id == campaign_id,
+            RunResponse.word_count.is_not(None),
+            RunResponse.word_count > 0,
+        )
+    )
+    overall_row = overall_result.one_or_none()
+    avg_geo_score = overall_row.avg_geo_score or 0.0 if overall_row else 0.0
+    total_runs_analyzed = overall_row.total_runs or 0 if overall_row else 0
+
+    # By provider
+    by_provider_result = await db.execute(
+        select(
+            RunResponse.llm_provider,
+            func.avg(
+                func.cast(RunResponse.citation_count, Float) /
+                func.nullif(func.cast(RunResponse.word_count, Float), 0)
+            ).label("avg_geo_score"),
+        )
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(
+            CampaignRun.campaign_id == campaign_id,
+            RunResponse.word_count.is_not(None),
+            RunResponse.word_count > 0,
+        )
+        .group_by(RunResponse.llm_provider)
+    )
+    by_provider = {}
+    for row in by_provider_result:
+        by_provider[row.llm_provider] = row.avg_geo_score or 0.0
+
+    return GEOScoreSummaryResponse(
+        campaign_id=campaign_id,
+        avg_geo_score=avg_geo_score,
+        total_runs_analyzed=total_runs_analyzed,
+        by_provider=by_provider,
+    )
+
+
+@router.get(
+    "/{campaign_id}/provider-comparison",
+    response_model=ProviderComparisonResponse,
+)
+async def get_provider_comparison(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> ProviderComparisonResponse:
+    """Get per-provider comparison metrics."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    # Aggregate by provider
+    provider_result = await db.execute(
+        select(
+            RunResponse.llm_provider,
+            func.count(RunResponse.id).label("total_responses"),
+            func.avg(RunResponse.word_count).label("avg_word_count"),
+            func.avg(RunResponse.citation_count).label("avg_citation_count"),
+            func.avg(RunResponse.latency_ms).label("avg_latency_ms"),
+        )
+        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+        .where(CampaignRun.campaign_id == campaign_id)
+        .group_by(RunResponse.llm_provider)
+    )
+
+    providers = []
+    for row in provider_result:
+        # Citation share for this provider
+        target_cit_result = await db.execute(
+            select(
+                func.count(RunCitation.id).label("total"),
+                func.sum(func.cast(RunCitation.is_target_brand, Integer)).label("target"),
+            )
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunResponse.llm_provider == row.llm_provider,
+            )
+        )
+        cit_row = target_cit_result.one_or_none()
+        citation_share = 0.0
+        if cit_row and cit_row.total and cit_row.total > 0:
+            citation_share = (cit_row.target or 0) / cit_row.total
+
+        providers.append(
+            ProviderMetrics(
+                provider=row.llm_provider,
+                total_responses=row.total_responses,
+                avg_word_count=row.avg_word_count or 0.0,
+                avg_citation_count=row.avg_citation_count or 0.0,
+                avg_latency_ms=row.avg_latency_ms or 0.0,
+                citation_share=citation_share,
+            )
+        )
+
+    return ProviderComparisonResponse(
+        campaign_id=campaign_id,
+        providers=providers,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
 
 
 @router.get(
@@ -633,3 +988,170 @@ async def get_campaign_summary(
         latest_run=latest_run,
         citation_share_by_brand={},  # Phase 4
     )
+
+
+@router.get("/{campaign_id}/export/csv")
+async def export_campaign_csv(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> StreamingResponse:
+    """Export campaign data as CSV. Requires membership."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    # Query all run responses with citations
+    # Join: CampaignRun -> RunResponse -> RunCitation -> QueryVersion
+    query = (
+        select(
+            CampaignRun.run_number,
+            CampaignRun.started_at,
+            RunResponse.llm_provider,
+            RunResponse.llm_model,
+            RunResponse.word_count,
+            RunResponse.citation_count,
+            RunResponse.latency_ms,
+            QueryVersion.text.label("query_text"),
+            RunCitation.cited_brand,
+            RunCitation.position_in_response,
+            RunCitation.is_target_brand,
+            RunCitation.confidence_score,
+            RunCitation.citation_span,
+        )
+        .join(RunResponse, RunResponse.campaign_run_id == CampaignRun.id)
+        .join(QueryVersion, QueryVersion.id == RunResponse.query_version_id)
+        .outerjoin(RunCitation, RunCitation.run_response_id == RunResponse.id)
+        .where(
+            CampaignRun.campaign_id == campaign_id,
+            CampaignRun.status == RunStatus.COMPLETED.value,
+        )
+        .order_by(CampaignRun.run_number, RunResponse.llm_provider)
+    )
+
+    result = await db.execute(query)
+    rows = result.all()
+
+    # Write CSV
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow([
+        "run_number",
+        "run_date",
+        "llm_provider",
+        "llm_model",
+        "query_text",
+        "cited_brand",
+        "position_in_response",
+        "is_target_brand",
+        "confidence_score",
+        "citation_span",
+        "word_count",
+        "citation_count",
+        "latency_ms",
+    ])
+
+    for row in rows:
+        writer.writerow([
+            row.run_number,
+            row.started_at.isoformat() if row.started_at else "",
+            row.llm_provider,
+            row.llm_model,
+            row.query_text,
+            row.cited_brand or "",
+            row.position_in_response if row.position_in_response is not None else "",
+            row.is_target_brand if row.is_target_brand is not None else "",
+            row.confidence_score if row.confidence_score is not None else "",
+            row.citation_span or "",
+            row.word_count or "",
+            row.citation_count or "",
+            row.latency_ms or "",
+        ])
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": f"attachment; filename=campaign_{campaign_id}_export.csv"
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Insights
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/{campaign_id}/insights",
+    response_model=list[InsightResponse],
+)
+async def list_insights(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+    include_dismissed: bool = False,
+) -> list[InsightResponse]:
+    """List insights for a campaign."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    query = select(Insight).where(
+        Insight.campaign_id == campaign_id,
+        Insight.workspace_id == workspace_id,
+    )
+    if not include_dismissed:
+        query = query.where(Insight.is_dismissed.is_(False))
+    query = query.order_by(Insight.created_at.desc())
+
+    result = await db.execute(query)
+    insights = result.scalars().all()
+    return [InsightResponse.model_validate(i) for i in insights]
+
+
+@router.post(
+    "/{campaign_id}/insights/generate",
+    response_model=list[InsightResponse],
+)
+async def generate_insights(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> list[InsightResponse]:
+    """Generate insights by running the insight engine."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    engine = InsightEngine()
+    insights = await engine.generate_insights(db, campaign_id, workspace_id)
+    return [InsightResponse.model_validate(i) for i in insights]
+
+
+@router.put(
+    "/{campaign_id}/insights/{insight_id}/dismiss",
+    response_model=InsightResponse,
+)
+async def dismiss_insight(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    insight_id: int,
+    member: WorkspaceMemberDep,
+) -> InsightResponse:
+    """Dismiss an insight."""
+    result = await db.execute(
+        select(Insight).where(
+            Insight.id == insight_id,
+            Insight.campaign_id == campaign_id,
+            Insight.workspace_id == workspace_id,
+        )
+    )
+    insight = result.scalar_one_or_none()
+    if insight is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Insight not found",
+        )
+    insight.is_dismissed = True
+    await db.commit()
+    await db.refresh(insight)
+    return InsightResponse.model_validate(insight)

@@ -18,9 +18,10 @@ Generate exactly $category_count distinct query categories that a $persona_type 
 
 ## Requirements
 1. Categories should be specific to the company's industry and offerings
-2. Categories should represent distinct areas of inquiry (no overlap)
-3. Each category should be broad enough to generate multiple specific queries
+2. **Categories must be mutually exclusive with no semantic overlap** — each should represent a distinct area of inquiry
+3. Each category should be specific enough to generate 5-10 distinct queries but broad enough to cover a meaningful area of inquiry
 4. Categories should reflect realistic user search behavior
+5. **Language awareness**: If the company operates primarily in a non-English market, generate category names in the appropriate language (e.g., Korean for Korean companies)
 
 ## Output Format
 Respond with a JSON array containing exactly $category_count category objects:
@@ -34,7 +35,9 @@ Respond with a JSON array containing exactly $category_count category objects:
 ]
 ```
 
-## Example Output (for a different company)
+## Example Outputs (for different companies)
+
+### Example 1: SaaS Company (English market)
 ```json
 [
   {
@@ -44,6 +47,42 @@ Respond with a JSON array containing exactly $category_count category objects:
   {
     "name": "Pricing & Value",
     "description": "Queries about pricing strategies, value for money, and discount availability"
+  }
+]
+```
+
+### Example 2: Consumer Electronics (Korean market)
+```json
+[
+  {
+    "name": "제품 기능 및 스펙",
+    "description": "제품의 주요 기능, 기술 사양, 혁신 기술에 대한 질문"
+  },
+  {
+    "name": "가격 경쟁력",
+    "description": "가격대, 가성비, 할인 혜택 및 프로모션에 대한 질문"
+  },
+  {
+    "name": "사용자 경험",
+    "description": "실제 사용 후기, 만족도, 불편 사항 등 사용자 경험 관련 질문"
+  }
+]
+```
+
+### Example 3: B2B Software Company (English market)
+```json
+[
+  {
+    "name": "Integration & Compatibility",
+    "description": "Queries about system integration capabilities, API availability, and third-party compatibility"
+  },
+  {
+    "name": "Security & Compliance",
+    "description": "Queries about data security, regulatory compliance (GDPR, SOC 2), and enterprise-grade security features"
+  },
+  {
+    "name": "Scalability & Performance",
+    "description": "Queries about system performance under load, scalability options, and infrastructure requirements"
   }
 ]
 ```

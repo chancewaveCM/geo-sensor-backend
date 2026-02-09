@@ -3,8 +3,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, Text
-from sqlalchemy import Enum as SQLEnum
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -25,34 +24,35 @@ class PipelineJob(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
 
     # Configuration
-    llm_providers: Mapped[list[str]] = mapped_column(JSON, nullable=False)  # ["gemini", "openai"]
+    # ["gemini", "openai"]
+    llm_providers: Mapped[list[str]] = mapped_column(sa.JSON, nullable=False)
 
     # Status tracking
-    status: Mapped[PipelineStatus] = mapped_column(
-        SQLEnum(PipelineStatus), default=PipelineStatus.PENDING
+    status: Mapped[str] = mapped_column(
+        sa.String(50), default=PipelineStatus.PENDING.value
     )
 
     # Progress tracking
-    total_queries: Mapped[int] = mapped_column(Integer, default=0)
-    completed_queries: Mapped[int] = mapped_column(Integer, default=0)
-    failed_queries: Mapped[int] = mapped_column(Integer, default=0)
+    total_queries: Mapped[int] = mapped_column(sa.Integer, default=0)
+    completed_queries: Mapped[int] = mapped_column(sa.Integer, default=0)
+    failed_queries: Mapped[int] = mapped_column(sa.Integer, default=0)
 
     # Timing
-    started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(sa.DateTime, nullable=True)
 
     # Error info
-    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
 
     # Foreign Keys
     query_set_id: Mapped[int] = mapped_column(
-        ForeignKey("query_sets.id"), nullable=False
+        sa.ForeignKey("query_sets.id"), nullable=False
     )
     company_profile_id: Mapped[int] = mapped_column(
-        ForeignKey("company_profiles.id"), nullable=False
+        sa.ForeignKey("company_profiles.id"), nullable=False
     )
     owner_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id"), nullable=False
+        sa.ForeignKey("users.id"), nullable=False
     )
 
     # Relationships

@@ -8,6 +8,7 @@ from app.api.v1.endpoints import (
     campaigns,
     company_profiles,
     comparisons,
+    dashboard,
     gallery,
     generated_queries,
     llm,
@@ -38,6 +39,7 @@ api_router.include_router(campaign_queries.router)
 api_router.include_router(gallery.router)
 api_router.include_router(comparisons.router)
 api_router.include_router(operations.router)
+api_router.include_router(dashboard.router)
 
 
 @api_router.get("/")

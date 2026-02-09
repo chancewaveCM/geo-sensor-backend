@@ -2,8 +2,7 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import ForeignKey, Integer, Text
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -20,15 +19,15 @@ class ExpandedQuery(Base, TimestampMixin):
     __tablename__ = "expanded_queries"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
-    status: Mapped[ExpandedQueryStatus] = mapped_column(
-        SQLEnum(ExpandedQueryStatus), default=ExpandedQueryStatus.PENDING
+    text: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    order_index: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    status: Mapped[str] = mapped_column(
+        sa.String(50), default=ExpandedQueryStatus.PENDING.value
     )
 
     # Foreign Keys
     category_id: Mapped[int] = mapped_column(
-        ForeignKey("pipeline_categories.id"), nullable=False
+        sa.ForeignKey("pipeline_categories.id"), nullable=False
     )
 
     # Relationships

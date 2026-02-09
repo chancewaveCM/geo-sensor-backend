@@ -219,3 +219,80 @@ class CampaignSummaryResponse(BaseModel):
     total_citations: int
     latest_run: CampaignRunResponse | None = None
     citation_share_by_brand: dict[str, float] = {}
+
+
+# --- Citation Analytics ---
+
+
+class CitationShareResponse(BaseModel):
+    """Citation share breakdown for a campaign."""
+
+    campaign_id: int
+    overall_citation_share: float  # 0.0-1.0
+    total_citations: int
+    target_brand_citations: int
+    by_provider: dict[str, float]  # {"openai": 0.35, "gemini": 0.28}
+    by_brand: list[dict]  # [{"brand": "Samsung", "share": 0.35, "count": 7}]
+
+
+class BrandRankingItem(BaseModel):
+    """Single brand ranking entry."""
+
+    rank: int
+    brand: str
+    citation_count: int
+    citation_share: float
+    is_target_brand: bool
+
+
+class BrandRankingResponse(BaseModel):
+    """Brand ranking by citation frequency."""
+
+    campaign_id: int
+    rankings: list[BrandRankingItem]
+    total_citations: int
+
+
+class ProviderMetrics(BaseModel):
+    """Metrics for a single LLM provider."""
+
+    provider: str
+    total_responses: int
+    avg_word_count: float
+    avg_citation_count: float
+    avg_latency_ms: float
+    citation_share: float  # target brand share for this provider
+
+
+class ProviderComparisonResponse(BaseModel):
+    """Provider comparison metrics."""
+
+    campaign_id: int
+    providers: list[ProviderMetrics]
+
+
+class GEOScoreSummaryResponse(BaseModel):
+    """GEO score summary (placeholder using proxy metrics)."""
+
+    campaign_id: int
+    avg_geo_score: float  # Proxy: citation_count / word_count
+    total_runs_analyzed: int
+    by_provider: dict[str, float]
+
+
+# --- Insight ---
+
+
+class InsightResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    workspace_id: int
+    campaign_id: int
+    insight_type: str
+    severity: str
+    title: str
+    description: str
+    data_json: str | None = None
+    is_dismissed: bool
+    created_at: datetime

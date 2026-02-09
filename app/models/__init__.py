@@ -41,6 +41,7 @@ from app.models.generated_query import (
     GeneratedQueryStatus,
     QueryCategory,
 )
+from app.models.insight import Insight
 from app.models.pipeline_category import PipelineCategory
 from app.models.pipeline_job import PipelineJob
 from app.models.project import Project
@@ -111,4 +112,6 @@ __all__ = [
     "ComparisonType",
     "OperationType",
     "OperationStatus",
+    # Insight
+    "Insight",
 ]

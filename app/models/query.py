@@ -1,7 +1,7 @@
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Text
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -22,11 +22,13 @@ class Query(Base, TimestampMixin):
     __tablename__ = "queries"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    status: Mapped[QueryStatus] = mapped_column(
-        Enum(QueryStatus), default=QueryStatus.PENDING, nullable=False
+    text: Mapped[str] = mapped_column(sa.Text, nullable=False)
+    status: Mapped[str] = mapped_column(
+        sa.String(50), default=QueryStatus.PENDING.value, nullable=False
     )
-    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id"), nullable=False)
+    project_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("projects.id"), nullable=False
+    )
 
     # Relationships
     project: Mapped["Project"] = relationship("Project", back_populates="queries")

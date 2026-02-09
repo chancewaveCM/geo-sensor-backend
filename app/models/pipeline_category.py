@@ -2,12 +2,10 @@
 
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum as SQLEnum
-from sqlalchemy import ForeignKey, Integer, String, Text
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
-from app.models.enums import LLMProvider, PersonaType
 
 if TYPE_CHECKING:
     from app.models.company_profile import CompanyProfile
@@ -21,22 +19,22 @@ class PipelineCategory(Base, TimestampMixin):
     __tablename__ = "pipeline_categories"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(255), nullable=False)
-    description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    persona_type: Mapped[PersonaType] = mapped_column(
-        SQLEnum(PersonaType), nullable=False
+    name: Mapped[str] = mapped_column(sa.String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(sa.Text, nullable=True)
+    persona_type: Mapped[str] = mapped_column(
+        sa.String(50), nullable=False
     )
-    llm_provider: Mapped[LLMProvider] = mapped_column(
-        SQLEnum(LLMProvider), nullable=False
+    llm_provider: Mapped[str] = mapped_column(
+        sa.String(50), nullable=False
     )
-    order_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    order_index: Mapped[int] = mapped_column(sa.Integer, nullable=False)
 
     # Foreign Keys
     company_profile_id: Mapped[int] = mapped_column(
-        ForeignKey("company_profiles.id"), nullable=False
+        sa.ForeignKey("company_profiles.id"), nullable=False
     )
     query_set_id: Mapped[int] = mapped_column(
-        ForeignKey("query_sets.id"), nullable=False
+        sa.ForeignKey("query_sets.id"), nullable=False
     )
 
     # Relationships

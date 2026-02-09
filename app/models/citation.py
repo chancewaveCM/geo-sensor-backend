@@ -1,7 +1,7 @@
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, Float, ForeignKey, Integer, String
+import sqlalchemy as sa
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
@@ -22,14 +22,22 @@ class Citation(Base, TimestampMixin):
     __tablename__ = "citations"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    matched_text: Mapped[str] = mapped_column(String(500), nullable=False)
-    match_type: Mapped[MatchType] = mapped_column(Enum(MatchType), nullable=False)
-    confidence: Mapped[float] = mapped_column(Float, nullable=False)  # 0.0 to 1.0
-    position_start: Mapped[int] = mapped_column(Integer, nullable=False)
-    position_end: Mapped[int] = mapped_column(Integer, nullable=False)
+    matched_text: Mapped[str] = mapped_column(sa.String(500), nullable=False)
+    match_type: Mapped[str] = mapped_column(
+        sa.String(50),
+        default=MatchType.EXACT.value,
+        nullable=False,
+    )
+    confidence: Mapped[float] = mapped_column(sa.Float, nullable=False)  # 0.0 to 1.0
+    position_start: Mapped[int] = mapped_column(sa.Integer, nullable=False)
+    position_end: Mapped[int] = mapped_column(sa.Integer, nullable=False)
 
-    brand_id: Mapped[int] = mapped_column(ForeignKey("brands.id"), nullable=False)
-    response_id: Mapped[int] = mapped_column(ForeignKey("responses.id"), nullable=False)
+    brand_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("brands.id"), nullable=False
+    )
+    response_id: Mapped[int] = mapped_column(
+        sa.ForeignKey("responses.id"), nullable=False
+    )
 
     # Relationships
     brand: Mapped["Brand"] = relationship("Brand", back_populates="citations")
