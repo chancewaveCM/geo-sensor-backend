@@ -49,6 +49,7 @@ from app.models.query_set import QuerySet
 from app.models.raw_llm_response import RawLLMResponse
 from app.models.response import Response
 from app.models.run_citation import RunCitation
+from app.models.schedule_config import ScheduleConfig
 from app.models.user import User
 from app.models.workspace import Workspace, WorkspaceMember
 
@@ -74,6 +75,7 @@ __all__ = [
     "PipelineCategory",
     "ExpandedQuery",
     "RawLLMResponse",
+    "ScheduleConfig",
     # Pipeline enums
     "PersonaType",
     "PipelineStatus",

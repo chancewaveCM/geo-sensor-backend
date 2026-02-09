@@ -1,7 +1,7 @@
 import asyncio
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,6 +18,7 @@ from app.db.session import async_session_maker
 from app.models.enums import PipelineStatus
 from app.models.pipeline_job import PipelineJob
 from app.services.campaign.scheduler import get_scheduler
+from app.services.scheduler.pipeline_scheduler import get_pipeline_scheduler
 
 logger = get_logger(__name__)
 
@@ -66,7 +67,7 @@ async def lifespan(app: FastAPI):
             .values(
                 status=PipelineStatus.FAILED,
                 error_message="Server restarted while job was running",
-                completed_at=datetime.utcnow(),
+                completed_at=datetime.now(tz=UTC),
             )
             .returning(PipelineJob.id)
         )
@@ -82,9 +83,23 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(scheduler.start())
     logger.info("Campaign scheduler started")
 
+    # Start pipeline scheduler in background
+    pipeline_scheduler = get_pipeline_scheduler(poll_interval_seconds=300)  # 5 min interval
+    pipeline_scheduler_task = asyncio.create_task(pipeline_scheduler.start())
+    logger.info("Pipeline scheduler started")
+
     yield
 
-    # Shutdown scheduler
+    # Shutdown pipeline scheduler
+    pipeline_scheduler.stop()
+    pipeline_scheduler_task.cancel()
+    try:
+        await pipeline_scheduler_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("Pipeline scheduler stopped")
+
+    # Shutdown campaign scheduler
     scheduler.stop()
     scheduler_task.cancel()
     try:
