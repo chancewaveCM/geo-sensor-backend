@@ -103,7 +103,8 @@ class InsightEngine:
 
         # Average per provider
         avg_provider_shares = {
-            p: sum(shares) / len(shares) for p, shares in provider_shares.items()
+            p: sum(shares) / len(shares) if shares else 0.0
+            for p, shares in provider_shares.items()
         }
 
         return overall_share, avg_provider_shares
