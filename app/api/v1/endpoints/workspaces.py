@@ -1,5 +1,6 @@
 """Workspace management endpoints."""
 
+import logging
 import re
 
 from fastapi import APIRouter, HTTPException, status
@@ -18,6 +19,8 @@ from app.schemas.workspace import (
     WorkspaceResponse,
     WorkspaceUpdate,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/workspaces", tags=["workspaces"])
 
@@ -84,9 +87,10 @@ async def create_workspace(
 
     except Exception as e:
         await db.rollback()
+        logger.error(f"Failed to create workspace: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create workspace: {str(e)}",
+            detail="Failed to create workspace",
         )
 
 
@@ -206,9 +210,10 @@ async def update_workspace(
 
     except Exception as e:
         await db.rollback()
+        logger.error(f"Failed to update workspace: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update workspace: {str(e)}",
+            detail="Failed to update workspace",
         )
 
 
@@ -236,9 +241,10 @@ async def delete_workspace(
         return {"message": "Workspace deleted"}
     except Exception as e:
         await db.rollback()
+        logger.error(f"Failed to delete workspace: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete workspace: {str(e)}",
+            detail="Failed to delete workspace",
         )
 
 
@@ -329,9 +335,10 @@ async def invite_workspace_member(
 
     except Exception as e:
         await db.rollback()
+        logger.error(f"Failed to invite member: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to invite member: {str(e)}",
+            detail="Failed to invite member",
         )
 
 
@@ -394,9 +401,10 @@ async def change_member_role(
 
     except Exception as e:
         await db.rollback()
+        logger.error(f"Failed to update member role: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update member role: {str(e)}",
+            detail="Failed to update member role",
         )
 
 
@@ -445,9 +453,10 @@ async def remove_workspace_member(
         return {"message": "Member removed"}
     except Exception as e:
         await db.rollback()
+        logger.error(f"Failed to remove member: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to remove member: {str(e)}",
+            detail="Failed to remove member",
         )
 
 

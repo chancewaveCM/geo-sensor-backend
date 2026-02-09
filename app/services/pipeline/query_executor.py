@@ -9,6 +9,7 @@ from app.models.enums import LLMProvider
 from app.models.expanded_query import ExpandedQuery
 from app.models.raw_llm_response import RawLLMResponse
 from app.services.llm.base import BaseLLMService
+from app.services.llm.prompts import QUERY_EXECUTION_SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class QueryExecutorService:
             start_time = time.perf_counter()
             try:
                 response = await asyncio.wait_for(
-                    llm.generate(query.text),
+                    llm.generate(query.text, system_prompt=QUERY_EXECUTION_SYSTEM_PROMPT),
                     timeout=settings.PIPELINE_LLM_TIMEOUT_SECONDS,
                 )
                 latency_ms = (time.perf_counter() - start_time) * 1000

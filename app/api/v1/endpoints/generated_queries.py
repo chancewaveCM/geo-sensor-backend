@@ -1,5 +1,7 @@
 """Generated Query endpoints."""
 
+import logging
+
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import select
 
@@ -15,6 +17,8 @@ from app.schemas.generated_query import (
     GenerateQueriesRequest,
 )
 from app.services.llm.factory import LLMFactory
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/generated-queries", tags=["generated-queries"])
 
@@ -100,9 +104,10 @@ async def generate_queries(
         response = await llm.generate(prompt)
         response_text = response.content  # LLMResponse 객체에서 content 추출
     except Exception as e:
+        logger.error(f"LLM service error: {e}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"LLM service error: {str(e)}"
+            detail="LLM service error"
         )
 
     # 응답 파싱

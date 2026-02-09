@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import WorkspaceMemberDep, get_db
 from app.core.config import settings
 from app.db.session import async_session_maker
 from app.models.company_profile import CompanyProfile
@@ -21,7 +21,6 @@ from app.models.pipeline_job import PipelineJob
 from app.models.query_set import QuerySet
 from app.models.raw_llm_response import RawLLMResponse
 from app.models.schedule_config import ScheduleConfig
-from app.models.user import User
 from app.services.llm.factory import LLMFactory
 from app.services.pipeline.background_manager import BackgroundJobManager
 from app.services.pipeline.category_generator import CategoryGeneratorService
@@ -29,7 +28,7 @@ from app.services.pipeline.orchestrator import PipelineOrchestratorService
 from app.services.pipeline.query_executor import QueryExecutorService
 from app.services.pipeline.query_expander import QueryExpanderService
 
-router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+router = APIRouter(prefix="/workspaces/{workspace_id}/pipeline", tags=["pipeline"])
 
 
 # ============ Schemas ============
@@ -116,7 +115,17 @@ class QuerySetHistoryResponse(BaseModel):
 class PipelineJobSummary(BaseModel):
     id: int
     status: str
+    company_profile_id: int
+    company_name: str | None = None
+    query_set_id: int | None = None
+    query_set_name: str | None = None
+    llm_providers: list[str]
+    total_queries: int
+    completed_queries: int
+    failed_queries: int
     progress_percentage: float
+    started_at: datetime | None
+    completed_at: datetime | None
     created_at: datetime
 
     class Config:
@@ -388,14 +397,14 @@ def _build_pipeline_services(
 async def start_pipeline(
     request: StartPipelineRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Start a new pipeline job for query generation."""
     # Validate company profile
     result = await db.execute(
         select(CompanyProfile).where(
             CompanyProfile.id == request.company_profile_id,
-            CompanyProfile.owner_id == current_user.id,
+            CompanyProfile.owner_id == member.user_id,
         )
     )
     profile = result.scalar_one_or_none()
@@ -415,7 +424,7 @@ async def start_pipeline(
         category_count=request.category_count,
         queries_per_category=request.queries_per_category,
         company_profile_id=profile.id,
-        owner_id=current_user.id,
+        owner_id=member.user_id,
     )
     db.add(query_set)
     await db.commit()
@@ -425,7 +434,7 @@ async def start_pipeline(
     job = PipelineJob(
         query_set_id=query_set.id,
         company_profile_id=profile.id,
-        owner_id=current_user.id,
+        owner_id=member.user_id,
         llm_providers=request.llm_providers,
         status=PipelineStatus.PENDING,
     )
@@ -469,13 +478,13 @@ async def start_pipeline(
 async def get_job_status(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get pipeline job status and progress."""
     result = await db.execute(
         select(PipelineJob).where(
             PipelineJob.id == job_id,
-            PipelineJob.owner_id == current_user.id,
+            PipelineJob.owner_id == member.user_id,
         )
     )
     job = result.scalar_one_or_none()
@@ -493,8 +502,10 @@ async def get_job_status(
 
     elapsed = None
     if job.started_at:
-        end_time = job.completed_at or datetime.now(tz=UTC)
-        elapsed = (end_time - job.started_at).total_seconds()
+        # SQLite stores naive datetimes, so use naive UTC now to avoid mismatch
+        end_time = job.completed_at or datetime.now(tz=UTC).replace(tzinfo=None)
+        started = job.started_at.replace(tzinfo=None) if job.started_at.tzinfo else job.started_at
+        elapsed = (end_time - started).total_seconds()
 
     # FIX #6: Return query_set_id instead of category_count/queries_per_category
     # Those fields are on QuerySet now, not PipelineJob
@@ -518,24 +529,32 @@ async def get_job_status(
 @router.get("/jobs", response_model=PipelineJobListResponse)
 async def list_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
     company_profile_id: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
     """List pipeline jobs, optionally filtered by company profile."""
-    query = select(PipelineJob).where(PipelineJob.owner_id == current_user.id)
+    query = select(PipelineJob).where(PipelineJob.owner_id == member.user_id)
 
     if company_profile_id:
         query = query.where(PipelineJob.company_profile_id == company_profile_id)
 
-    query = query.order_by(PipelineJob.created_at.desc()).offset(offset).limit(limit)
+    query = (
+        query.order_by(PipelineJob.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .options(
+            selectinload(PipelineJob.company_profile),
+            selectinload(PipelineJob.query_set),
+        )
+    )
 
     result = await db.execute(query)
     jobs = result.scalars().all()
 
     # Get total count
-    count_query = select(func.count(PipelineJob.id)).where(PipelineJob.owner_id == current_user.id)
+    count_query = select(func.count(PipelineJob.id)).where(PipelineJob.owner_id == member.user_id)
     if company_profile_id:
         count_query = count_query.where(
             PipelineJob.company_profile_id == company_profile_id
@@ -548,10 +567,20 @@ async def list_jobs(
             PipelineJobSummary(
                 id=j.id,
                 status=j.status.value,
+                company_profile_id=j.company_profile_id,
+                company_name=j.company_profile.name if j.company_profile else None,
+                query_set_id=j.query_set_id,
+                query_set_name=j.query_set.name if j.query_set else None,
+                llm_providers=j.llm_providers,
+                total_queries=j.total_queries,
+                completed_queries=j.completed_queries,
+                failed_queries=j.failed_queries,
                 progress_percentage=(
                     (j.completed_queries + j.failed_queries) / j.total_queries * 100
                     if j.total_queries > 0 else 0
                 ),
+                started_at=j.started_at,
+                completed_at=j.completed_at,
                 created_at=j.created_at,
             )
             for j in jobs
@@ -564,13 +593,13 @@ async def list_jobs(
 async def cancel_job(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Cancel a running pipeline job."""
     result = await db.execute(
         select(PipelineJob).where(
             PipelineJob.id == job_id,
-            PipelineJob.owner_id == current_user.id,
+            PipelineJob.owner_id == member.user_id,
         )
     )
     job = result.scalar_one_or_none()
@@ -604,14 +633,14 @@ async def cancel_job(
 async def get_categories(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get generated categories for a pipeline job."""
     # FIX #2: Get job first to access its query_set_id
     job_result = await db.execute(
         select(PipelineJob).where(
             PipelineJob.id == job_id,
-            PipelineJob.owner_id == current_user.id,
+            PipelineJob.owner_id == member.user_id,
         )
     )
     job = job_result.scalar_one_or_none()
@@ -652,7 +681,7 @@ async def get_categories(
 async def get_queries(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
     category_id: int | None = None,
 ):
     """Get expanded queries for a pipeline job."""
@@ -660,7 +689,7 @@ async def get_queries(
     job_result = await db.execute(
         select(PipelineJob).where(
             PipelineJob.id == job_id,
-            PipelineJob.owner_id == current_user.id,
+            PipelineJob.owner_id == member.user_id,
         )
     )
     job = job_result.scalar_one_or_none()
@@ -709,7 +738,7 @@ async def get_queries(
 async def get_responses(
     query_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get raw LLM responses for a query."""
     # FIX #4: Verify ownership through the correct path
@@ -726,7 +755,7 @@ async def get_responses(
     query_obj = query_result.scalar_one_or_none()
 
     # FIX #4: Traverse correct ownership path: query -> category -> query_set -> owner_id
-    if not query_obj or query_obj.category.query_set.owner_id != current_user.id:
+    if not query_obj or query_obj.category.query_set.owner_id != member.user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Query not found",
@@ -761,14 +790,14 @@ async def rerun_query_set(
     query_set_id: int,
     request: RerunQuerySetRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Re-run an existing QuerySet to create new time-series data point."""
     # Verify ownership
     qs_result = await db.execute(
         select(QuerySet).where(
             QuerySet.id == query_set_id,
-            QuerySet.owner_id == current_user.id,
+            QuerySet.owner_id == member.user_id,
         )
     )
     query_set = qs_result.scalar_one_or_none()
@@ -798,7 +827,7 @@ async def rerun_query_set(
     job = PipelineJob(
         query_set_id=query_set.id,
         company_profile_id=query_set.company_profile_id,
-        owner_id=current_user.id,
+        owner_id=member.user_id,
         llm_providers=request.llm_providers,
         status=PipelineStatus.PENDING,
     )
@@ -842,14 +871,14 @@ async def rerun_query_set(
 async def get_query_set_history(
     query_set_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get execution history for a QuerySet (for time-series analysis)."""
     # Verify ownership
     qs_result = await db.execute(
         select(QuerySet).where(
             QuerySet.id == query_set_id,
-            QuerySet.owner_id == current_user.id,
+            QuerySet.owner_id == member.user_id,
         )
     )
     query_set = qs_result.scalar_one_or_none()
@@ -888,7 +917,7 @@ async def get_query_set_history(
 @router.get("/queryset", response_model=QuerySetListResponse)
 async def list_query_sets(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
     company_profile_id: int | None = None,
     limit: int = 20,
     offset: int = 0,
@@ -940,7 +969,7 @@ async def list_query_sets(
             total_responses_subq.label("total_responses"),
             job_count_subq.label("job_count"),
         )
-        .where(QuerySet.owner_id == current_user.id)
+        .where(QuerySet.owner_id == member.user_id)
     )
 
     if company_profile_id:
@@ -952,7 +981,7 @@ async def list_query_sets(
     rows = result.all()
 
     # Get total count
-    count_query = select(func.count(QuerySet.id)).where(QuerySet.owner_id == current_user.id)
+    count_query = select(func.count(QuerySet.id)).where(QuerySet.owner_id == member.user_id)
     if company_profile_id:
         count_query = count_query.where(QuerySet.company_profile_id == company_profile_id)
     count_result = await db.execute(count_query)
@@ -983,7 +1012,7 @@ async def list_query_sets(
 async def get_query_set_detail(
     query_set_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get detailed information about a QuerySet including categories and job history."""
     # Verify ownership and load with relationships
@@ -991,7 +1020,7 @@ async def get_query_set_detail(
         select(QuerySet)
         .where(
             QuerySet.id == query_set_id,
-            QuerySet.owner_id == current_user.id,
+            QuerySet.owner_id == member.user_id,
         )
         .options(
             selectinload(QuerySet.categories).selectinload(PipelineCategory.expanded_queries),
@@ -1063,7 +1092,7 @@ async def update_category(
     category_id: int,
     request: UpdateCategoryRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Partially update a category."""
     # Load category with query_set for auth
@@ -1074,7 +1103,7 @@ async def update_category(
         .options(selectinload(PipelineCategory.expanded_queries))
     )
     category = result.scalar_one_or_none()
-    if not category or category.query_set.owner_id != current_user.id:
+    if not category or category.query_set.owner_id != member.user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found",
@@ -1104,7 +1133,7 @@ async def update_category(
 async def delete_category(
     category_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Delete a category (cascade deletes expanded queries)."""
     # Load category with query_set for auth
@@ -1114,7 +1143,7 @@ async def delete_category(
         .options(selectinload(PipelineCategory.query_set))
     )
     category = result.scalar_one_or_none()
-    if not category or category.query_set.owner_id != current_user.id:
+    if not category or category.query_set.owner_id != member.user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found",
@@ -1132,14 +1161,14 @@ async def create_category(
     query_set_id: int,
     request: CreateCategoryRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Create a new category for a query set."""
     # Verify ownership
     qs_result = await db.execute(
         select(QuerySet).where(
             QuerySet.id == query_set_id,
-            QuerySet.owner_id == current_user.id,
+            QuerySet.owner_id == member.user_id,
         )
     )
     query_set = qs_result.scalar_one_or_none()
@@ -1199,7 +1228,7 @@ async def create_category(
 async def get_category_queries(
     category_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get expanded queries for a category."""
     # Load category with query_set for auth
@@ -1209,7 +1238,7 @@ async def get_category_queries(
         .options(selectinload(PipelineCategory.query_set))
     )
     category = result.scalar_one_or_none()
-    if not category or category.query_set.owner_id != current_user.id:
+    if not category or category.query_set.owner_id != member.user_id:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found",
@@ -1243,7 +1272,7 @@ async def get_category_queries(
 @router.get("/profiles/stats", response_model=ProfileStatsListResponse)
 async def get_profile_pipeline_stats(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Get pipeline health statistics for each company profile.
 
@@ -1263,7 +1292,7 @@ async def get_profile_pipeline_stats(
             QuerySet.company_profile_id,
             func.count(QuerySet.id).label("total_query_sets"),
         )
-        .where(QuerySet.owner_id == current_user.id)
+        .where(QuerySet.owner_id == member.user_id)
         .group_by(QuerySet.company_profile_id)
         .subquery()
     )
@@ -1274,7 +1303,7 @@ async def get_profile_pipeline_stats(
             func.coalesce(qs_count_subq.c.total_query_sets, 0).label("total_query_sets"),
         )
         .outerjoin(qs_count_subq, CompanyProfile.id == qs_count_subq.c.company_profile_id)
-        .where(CompanyProfile.owner_id == current_user.id)
+        .where(CompanyProfile.owner_id == member.user_id)
     )
     profile_rows = profiles_result.all()
 
@@ -1342,7 +1371,7 @@ async def get_profile_pipeline_stats(
         )
         .where(
             PipelineJob.company_profile_id.in_(profile_ids),
-            PipelineJob.owner_id == current_user.id,
+            PipelineJob.owner_id == member.user_id,
         )
         .group_by(PipelineJob.company_profile_id)
     )
@@ -1364,7 +1393,7 @@ async def get_profile_pipeline_stats(
         )
         .where(
             PipelineJob.company_profile_id.in_(profile_ids),
-            PipelineJob.owner_id == current_user.id,
+            PipelineJob.owner_id == member.user_id,
         )
         .subquery()
     )
@@ -1481,14 +1510,14 @@ async def get_profile_pipeline_stats(
 async def create_schedule(
     request: CreateScheduleRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Create a pipeline schedule for a QuerySet."""
     # Verify QuerySet ownership
     qs_result = await db.execute(
         select(QuerySet).where(
             QuerySet.id == request.query_set_id,
-            QuerySet.owner_id == current_user.id,
+            QuerySet.owner_id == member.user_id,
         )
     )
     query_set = qs_result.scalar_one_or_none()
@@ -1523,7 +1552,7 @@ async def create_schedule(
         is_active=request.is_active,
         llm_providers=request.llm_providers,
         next_run_at=next_run,
-        owner_id=current_user.id,
+        owner_id=member.user_id,
     )
     db.add(schedule)
     try:
@@ -1552,14 +1581,14 @@ async def create_schedule(
 @router.get("/schedules", response_model=ScheduleListResponse)
 async def list_schedules(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
     limit: int = 20,
     offset: int = 0,
 ):
     """List all pipeline schedules for the current user."""
     result = await db.execute(
         select(ScheduleConfig)
-        .where(ScheduleConfig.owner_id == current_user.id)
+        .where(ScheduleConfig.owner_id == member.user_id)
         .order_by(ScheduleConfig.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -1570,7 +1599,7 @@ async def list_schedules(
     # Get total count
     count_result = await db.execute(
         select(func.count(ScheduleConfig.id))
-        .where(ScheduleConfig.owner_id == current_user.id)
+        .where(ScheduleConfig.owner_id == member.user_id)
     )
     total = count_result.scalar() or 0
 
@@ -1598,14 +1627,14 @@ async def update_schedule(
     schedule_id: int,
     request: UpdateScheduleRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Update a pipeline schedule."""
     result = await db.execute(
         select(ScheduleConfig)
         .where(
             ScheduleConfig.id == schedule_id,
-            ScheduleConfig.owner_id == current_user.id,
+            ScheduleConfig.owner_id == member.user_id,
         )
         .options(selectinload(ScheduleConfig.query_set))
     )
@@ -1652,13 +1681,13 @@ async def update_schedule(
 async def delete_schedule(
     schedule_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    member: WorkspaceMemberDep,
 ):
     """Delete a pipeline schedule."""
     result = await db.execute(
         select(ScheduleConfig).where(
             ScheduleConfig.id == schedule_id,
-            ScheduleConfig.owner_id == current_user.id,
+            ScheduleConfig.owner_id == member.user_id,
         )
     )
     schedule = result.scalar_one_or_none()

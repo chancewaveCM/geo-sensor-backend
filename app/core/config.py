@@ -1,4 +1,3 @@
-import warnings
 from functools import lru_cache
 
 from pydantic import model_validator
@@ -30,13 +29,11 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_secret_key(self) -> "Settings":
-        """Warn if using insecure default SECRET_KEY in non-debug mode."""
+        """Block startup if using insecure default SECRET_KEY in non-debug mode."""
         if not self.DEBUG and self.SECRET_KEY == _INSECURE_SECRET_KEY:
-            warnings.warn(
-                "Using insecure default SECRET_KEY in production! "
-                "Set SECRET_KEY environment variable.",
-                UserWarning,
-                stacklevel=2,
+            raise ValueError(
+                "SECRET_KEY environment variable must be set in production. "
+                "Set SECRET_KEY in .env file or environment variables."
             )
         return self
 

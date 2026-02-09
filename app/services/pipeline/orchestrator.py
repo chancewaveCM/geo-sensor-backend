@@ -1,7 +1,7 @@
 """Pipeline orchestration service."""
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +62,7 @@ class PipelineOrchestratorService:
                     f"job={job_id}, profile={company_profile_id}, query_set={query_set_id}"
                 )
 
-            job.started_at = datetime.utcnow()
+            job.started_at = datetime.now(tz=UTC)
 
             if is_rerun:
                 # Rerun: Use existing categories and queries from QuerySet
@@ -225,7 +225,7 @@ class PipelineOrchestratorService:
     async def _complete_job(self, job: PipelineJob) -> None:
         """Mark job as completed."""
         job.status = PipelineStatus.COMPLETED
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(tz=UTC)
         await self.db.commit()
         logger.info(
             f"Job {job.id} completed: "
@@ -236,6 +236,6 @@ class PipelineOrchestratorService:
         """Mark job as failed."""
         job.status = PipelineStatus.FAILED
         job.error_message = error_message
-        job.completed_at = datetime.utcnow()
+        job.completed_at = datetime.now(tz=UTC)
         await self.db.commit()
         logger.error(f"Job {job.id} failed: {error_message}")

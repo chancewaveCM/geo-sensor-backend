@@ -109,7 +109,8 @@ async def query_single_provider(
             latency_ms=latency_ms,
         ), None
     except Exception as e:
-        return None, str(e)
+        logger.error(f"LLM generation failed: {e}")
+        return None, "LLM generation failed"
 
 
 # Endpoints
