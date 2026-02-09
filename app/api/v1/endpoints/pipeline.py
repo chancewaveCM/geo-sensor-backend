@@ -305,6 +305,8 @@ class ScheduleConfigResponse(BaseModel):
     id: int
     query_set_id: int
     query_set_name: str
+    company_profile_id: int
+    company_name: str
     interval_minutes: int
     is_active: bool
     last_run_at: datetime | None
@@ -1516,10 +1518,12 @@ async def create_schedule(
     """Create a pipeline schedule for a QuerySet."""
     # Verify QuerySet ownership
     qs_result = await db.execute(
-        select(QuerySet).where(
+        select(QuerySet)
+        .where(
             QuerySet.id == request.query_set_id,
             QuerySet.owner_id == current_user.id,
         )
+        .options(selectinload(QuerySet.company_profile))
     )
     query_set = qs_result.scalar_one_or_none()
     if not query_set:
@@ -1570,6 +1574,8 @@ async def create_schedule(
         id=schedule.id,
         query_set_id=schedule.query_set_id,
         query_set_name=query_set.name,
+        company_profile_id=query_set.company_profile_id,
+        company_name=query_set.company_profile.name,
         interval_minutes=schedule.interval_minutes,
         is_active=schedule.is_active,
         last_run_at=schedule.last_run_at,
@@ -1583,25 +1589,48 @@ async def create_schedule(
 async def list_schedules(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    query_set_id: int | None = None,
+    company_profile_id: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
     """List all pipeline schedules for the current user."""
+    query = select(ScheduleConfig).where(ScheduleConfig.owner_id == current_user.id)
+    count_query = select(func.count(ScheduleConfig.id)).where(
+        ScheduleConfig.owner_id == current_user.id
+    )
+
+    if query_set_id is not None:
+        query = query.where(ScheduleConfig.query_set_id == query_set_id)
+        count_query = count_query.where(ScheduleConfig.query_set_id == query_set_id)
+
+    if company_profile_id is not None:
+        query = (
+            query
+            .join(QuerySet, ScheduleConfig.query_set_id == QuerySet.id)
+            .where(QuerySet.company_profile_id == company_profile_id)
+        )
+        count_query = (
+            count_query
+            .join(QuerySet, ScheduleConfig.query_set_id == QuerySet.id)
+            .where(QuerySet.company_profile_id == company_profile_id)
+        )
+
     result = await db.execute(
-        select(ScheduleConfig)
-        .where(ScheduleConfig.owner_id == current_user.id)
+        query
         .order_by(ScheduleConfig.created_at.desc())
         .offset(offset)
         .limit(limit)
-        .options(selectinload(ScheduleConfig.query_set))
+        .options(
+            selectinload(ScheduleConfig.query_set).selectinload(
+                QuerySet.company_profile
+            )
+        )
     )
     schedules = result.scalars().all()
 
     # Get total count
-    count_result = await db.execute(
-        select(func.count(ScheduleConfig.id))
-        .where(ScheduleConfig.owner_id == current_user.id)
-    )
+    count_result = await db.execute(count_query)
     total = count_result.scalar() or 0
 
     return ScheduleListResponse(
@@ -1610,6 +1639,8 @@ async def list_schedules(
                 id=s.id,
                 query_set_id=s.query_set_id,
                 query_set_name=s.query_set.name,
+                company_profile_id=s.query_set.company_profile_id,
+                company_name=s.query_set.company_profile.name,
                 interval_minutes=s.interval_minutes,
                 is_active=s.is_active,
                 last_run_at=s.last_run_at,
@@ -1637,7 +1668,11 @@ async def update_schedule(
             ScheduleConfig.id == schedule_id,
             ScheduleConfig.owner_id == current_user.id,
         )
-        .options(selectinload(ScheduleConfig.query_set))
+        .options(
+            selectinload(ScheduleConfig.query_set).selectinload(
+                QuerySet.company_profile
+            )
+        )
     )
     schedule = result.scalar_one_or_none()
     if not schedule:
@@ -1669,6 +1704,8 @@ async def update_schedule(
         id=schedule.id,
         query_set_id=schedule.query_set_id,
         query_set_name=schedule.query_set.name,
+        company_profile_id=schedule.query_set.company_profile_id,
+        company_name=schedule.query_set.company_profile.name,
         interval_minutes=schedule.interval_minutes,
         is_active=schedule.is_active,
         last_run_at=schedule.last_run_at,
