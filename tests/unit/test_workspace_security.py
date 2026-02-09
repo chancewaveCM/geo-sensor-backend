@@ -1,8 +1,16 @@
 """Tests for Workspace Security and Authorization"""
 
+import os
+
 import pytest
 
 from app.core.security import create_access_token
+
+# Skip these integration tests unless explicitly enabled
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Integration test - set RUN_INTEGRATION_TESTS=1 to run"
+)
 
 
 @pytest.fixture

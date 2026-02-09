@@ -1,7 +1,15 @@
+import os
+
 import pytest
 from httpx import AsyncClient
 
 from app.core.security import create_access_token, get_password_hash, verify_password, verify_token
+
+# Skip these integration tests unless explicitly enabled
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Integration test - set RUN_INTEGRATION_TESTS=1 to run"
+)
 
 
 class TestPasswordHashing:

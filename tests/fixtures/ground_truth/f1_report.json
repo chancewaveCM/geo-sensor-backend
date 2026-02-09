@@ -1,0 +1,1032 @@
+{
+  "aggregate": {
+    "precision": 100.0,
+    "recall": 96.23,
+    "f1_score": 98.08,
+    "total_tp": 51,
+    "total_fp": 0,
+    "total_fn": 2,
+    "total_samples": 50,
+    "correct_samples": 49,
+    "fuzzy_threshold": 0.85
+  },
+  "per_brand": {
+    "Samsung": {
+      "precision": 100.0,
+      "recall": 88.89,
+      "f1": 94.12,
+      "tp": 8,
+      "fp": 0,
+      "fn": 1
+    },
+    "Apple": {
+      "precision": 100.0,
+      "recall": 90.91,
+      "f1": 95.24,
+      "tp": 10,
+      "fp": 0,
+      "fn": 1
+    },
+    "Google": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 9,
+      "fp": 0,
+      "fn": 0
+    },
+    "Microsoft": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 7,
+      "fp": 0,
+      "fn": 0
+    },
+    "Amazon": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 5,
+      "fp": 0,
+      "fn": 0
+    },
+    "Tesla": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 6,
+      "fp": 0,
+      "fn": 0
+    },
+    "Nike": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 3,
+      "fp": 0,
+      "fn": 0
+    },
+    "Sony": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 3,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "per_difficulty": {
+    "easy": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 9,
+      "fp": 0,
+      "fn": 0
+    },
+    "medium": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 25,
+      "fp": 0,
+      "fn": 0
+    },
+    "hard": {
+      "precision": 100.0,
+      "recall": 89.47,
+      "f1": 94.44,
+      "tp": 17,
+      "fp": 0,
+      "fn": 2
+    }
+  },
+  "per_match_type": {
+    "exact": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 16,
+      "fp": 0,
+      "fn": 0
+    },
+    "alias": {
+      "precision": 100.0,
+      "recall": 84.62,
+      "f1": 91.67,
+      "tp": 11,
+      "fp": 0,
+      "fn": 2
+    },
+    "keyword": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 20,
+      "fp": 0,
+      "fn": 0
+    },
+    "fuzzy": {
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1": 100.0,
+      "tp": 4,
+      "fp": 0,
+      "fn": 0
+    }
+  },
+  "per_sample": [
+    {
+      "id": 1,
+      "text_preview": "Samsung Galaxy S25 Ultra features a revolutionary camera system with 200MP resol...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Samsung"
+      ],
+      "predicted": [
+        "Samsung"
+      ],
+      "tp": [
+        "Samsung"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 2,
+      "text_preview": "Apple's latest iPhone 16 Pro Max introduces enhanced AI capabilities and improve...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Apple"
+      ],
+      "predicted": [
+        "Apple"
+      ],
+      "tp": [
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 3,
+      "text_preview": "Google Pixel 9 Pro offers exceptional computational photography and integrates s...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 4,
+      "text_preview": "Microsoft Surface Laptop 6 delivers premium build quality with excellent perform...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Microsoft"
+      ],
+      "predicted": [
+        "Microsoft"
+      ],
+      "tp": [
+        "Microsoft"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 5,
+      "text_preview": "Amazon Alexa now supports more natural language processing, making smart home co...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Amazon"
+      ],
+      "predicted": [
+        "Amazon"
+      ],
+      "tp": [
+        "Amazon"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 6,
+      "text_preview": "Tesla Model Y has become one of the best-selling electric vehicles worldwide, th...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Tesla"
+      ],
+      "predicted": [
+        "Tesla"
+      ],
+      "tp": [
+        "Tesla"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 7,
+      "text_preview": "Nike Air Jordan 1 remains a cultural icon in sneaker history, with new colorways...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Nike"
+      ],
+      "predicted": [
+        "Nike"
+      ],
+      "tp": [
+        "Nike"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 8,
+      "text_preview": "Sony PlayStation 5 continues to dominate the console gaming market with exclusiv...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Sony"
+      ],
+      "predicted": [
+        "Sony"
+      ],
+      "tp": [
+        "Sony"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 9,
+      "text_preview": "When comparing Samsung and Apple flagship phones, both offer premium features bu...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Samsung",
+        "Apple"
+      ],
+      "predicted": [
+        "Samsung",
+        "Apple"
+      ],
+      "tp": [
+        "Samsung",
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 10,
+      "text_preview": "Google and Microsoft are competing fiercely in the cloud computing space, each o...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Microsoft",
+        "Google"
+      ],
+      "predicted": [
+        "Microsoft",
+        "Google"
+      ],
+      "tp": [
+        "Microsoft",
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 11,
+      "text_preview": "Tesla and traditional automakers are racing to expand electric vehicle charging ...",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [
+        "Tesla"
+      ],
+      "predicted": [
+        "Tesla"
+      ],
+      "tp": [
+        "Tesla"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 12,
+      "text_preview": "삼성전자의 최신 갤럭시 폴드는 혁신적인 폴더블 디스플레이 기술을 선보였습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Samsung"
+      ],
+      "predicted": [
+        "Samsung"
+      ],
+      "tp": [
+        "Samsung"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 13,
+      "text_preview": "애플의 아이폰은 여전히 프리미엄 스마트폰 시장을 선도하고 있습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Apple"
+      ],
+      "predicted": [
+        "Apple"
+      ],
+      "tp": [
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 14,
+      "text_preview": "구글 안드로이드 운영체제는 전 세계적으로 가장 많이 사용되는 모바일 플랫폼입니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 15,
+      "text_preview": "마이크로소프트 윈도우 11은 개선된 사용자 인터페이스와 성능을 제공합니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Microsoft"
+      ],
+      "predicted": [
+        "Microsoft"
+      ],
+      "tp": [
+        "Microsoft"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 16,
+      "text_preview": "아마존 AWS는 클라우드 컴퓨팅 분야에서 압도적인 시장 점유율을 보이고 있습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Amazon"
+      ],
+      "predicted": [
+        "Amazon"
+      ],
+      "tp": [
+        "Amazon"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 17,
+      "text_preview": "테슬라 Model 3는 가성비 좋은 전기차로 많은 인기를 끌고 있습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Tesla"
+      ],
+      "predicted": [
+        "Tesla"
+      ],
+      "tp": [
+        "Tesla"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 18,
+      "text_preview": "나이키 운동화는 전문 운동선수와 일반 소비자 모두에게 사랑받고 있습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Nike"
+      ],
+      "predicted": [
+        "Nike"
+      ],
+      "tp": [
+        "Nike"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 19,
+      "text_preview": "소니 PS5는 차세대 게임 콘솔로서 뛰어난 그래픽 성능을 자랑합니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Sony"
+      ],
+      "predicted": [
+        "Sony"
+      ],
+      "tp": [
+        "Sony"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 20,
+      "text_preview": "The new Galaxy S25 series brings significant camera improvements and faster proc...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Samsung"
+      ],
+      "predicted": [
+        "Samsung"
+      ],
+      "tp": [
+        "Samsung"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 21,
+      "text_preview": "I recently upgraded to the iPhone 16 and the difference in performance is remark...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Apple"
+      ],
+      "predicted": [
+        "Apple"
+      ],
+      "tp": [
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 22,
+      "text_preview": "The Pixel 9's computational photography capabilities outperform many competitors...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 23,
+      "text_preview": "Windows 11 offers better gaming performance and a more modern interface than pre...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Microsoft"
+      ],
+      "predicted": [
+        "Microsoft"
+      ],
+      "tp": [
+        "Microsoft"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 24,
+      "text_preview": "Setting up Alexa in your home takes just a few minutes and provides convenient v...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Amazon"
+      ],
+      "predicted": [
+        "Amazon"
+      ],
+      "tp": [
+        "Amazon"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 25,
+      "text_preview": "The Model Y autopilot feature makes long highway drives much more comfortable an...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Tesla"
+      ],
+      "predicted": [
+        "Tesla"
+      ],
+      "tp": [
+        "Tesla"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 26,
+      "text_preview": "Air Jordan sneakers have maintained their cultural relevance for decades through...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Nike"
+      ],
+      "predicted": [
+        "Nike"
+      ],
+      "tp": [
+        "Nike"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 27,
+      "text_preview": "PlayStation exclusive games like God of War and Spider-Man showcase the console'...",
+      "language": "en",
+      "difficulty": "medium",
+      "expected": [
+        "Sony"
+      ],
+      "predicted": [
+        "Sony"
+      ],
+      "tp": [
+        "Sony"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 28,
+      "text_preview": "구글 Pixel 9이 정말 좋아요. 카메라 성능이 뛰어납니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 29,
+      "text_preview": "삼성 갤럭시 워치는 아이폰과도 호환되지만 일부 기능이 제한됩니다.",
+      "language": "ko",
+      "difficulty": "hard",
+      "expected": [
+        "Samsung",
+        "Apple"
+      ],
+      "predicted": [
+        "Samsung",
+        "Apple"
+      ],
+      "tp": [
+        "Samsung",
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 30,
+      "text_preview": "맥북 프로는 고성능 작업에 적합하며 배터리 수명도 우수합니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Apple"
+      ],
+      "predicted": [
+        "Apple"
+      ],
+      "tp": [
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 31,
+      "text_preview": "Xbox Game Pass는 게임 구독 서비스 중 가장 가성비가 좋습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Microsoft"
+      ],
+      "predicted": [
+        "Microsoft"
+      ],
+      "tp": [
+        "Microsoft"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 32,
+      "text_preview": "Amazon Kindle로 독서하면 눈의 피로가 적고 휴대성이 좋습니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Amazon"
+      ],
+      "predicted": [
+        "Amazon"
+      ],
+      "tp": [
+        "Amazon"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 33,
+      "text_preview": "테슬라 Model 3와 Model Y 중 어떤 것을 선택해야 할지 고민입니다.",
+      "language": "ko",
+      "difficulty": "medium",
+      "expected": [
+        "Tesla"
+      ],
+      "predicted": [
+        "Tesla"
+      ],
+      "tp": [
+        "Tesla"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 34,
+      "text_preview": "The weather is nice today. I think I'll go for a walk in the park.",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [],
+      "predicted": [],
+      "tp": [],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 35,
+      "text_preview": "To make a good cup of coffee, use freshly ground beans and filtered water.",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [],
+      "predicted": [],
+      "tp": [],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 36,
+      "text_preview": "Learning a new language requires consistent practice and patience over time.",
+      "language": "en",
+      "difficulty": "easy",
+      "expected": [],
+      "predicted": [],
+      "tp": [],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 37,
+      "text_preview": "오늘 날씨가 정말 좋네요. 산책하기 딱 좋은 날입니다.",
+      "language": "ko",
+      "difficulty": "easy",
+      "expected": [],
+      "predicted": [],
+      "tp": [],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 38,
+      "text_preview": "건강한 식단을 유지하려면 신선한 채소와 과일을 많이 섭취해야 합니다.",
+      "language": "ko",
+      "difficulty": "easy",
+      "expected": [],
+      "predicted": [],
+      "tp": [],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 39,
+      "text_preview": "Samsng Galaxy devices offer great value for money.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Samsung"
+      ],
+      "predicted": [
+        "Samsung"
+      ],
+      "tp": [
+        "Samsung"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 40,
+      "text_preview": "APPLE Inc. reported strong quarterly earnings driven by iPhone sales.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Apple"
+      ],
+      "predicted": [
+        "Apple"
+      ],
+      "tp": [
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 41,
+      "text_preview": "Googl's search algorithm continues to evolve with AI integration.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 42,
+      "text_preview": "Microsft has been investing heavily in cloud infrastructure.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Microsoft"
+      ],
+      "predicted": [
+        "Microsoft"
+      ],
+      "tp": [
+        "Microsoft"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 43,
+      "text_preview": "Teslas are known for their impressive acceleration and range.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Tesla"
+      ],
+      "predicted": [
+        "Tesla"
+      ],
+      "tp": [
+        "Tesla"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 44,
+      "text_preview": "For the best smartphone camera in 2025, consider the Galaxy S25 Ultra or iPhone ...",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Samsung",
+        "Apple"
+      ],
+      "predicted": [
+        "Samsung",
+        "Apple"
+      ],
+      "tp": [
+        "Samsung",
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 45,
+      "text_preview": "삼성과 애플은 프리미엄 스마트폰 시장의 양대 산맥입니다.",
+      "language": "ko",
+      "difficulty": "hard",
+      "expected": [
+        "Samsung",
+        "Apple"
+      ],
+      "predicted": [],
+      "tp": [],
+      "fp": [],
+      "fn": [
+        "Samsung",
+        "Apple"
+      ],
+      "correct": false
+    },
+    {
+      "id": 46,
+      "text_preview": "The Surface Laptop competes directly with the MacBook in the premium laptop segm...",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Microsoft",
+        "Apple"
+      ],
+      "predicted": [
+        "Microsoft",
+        "Apple"
+      ],
+      "tp": [
+        "Microsoft",
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 47,
+      "text_preview": "Both AWS and Google Cloud offer robust solutions for enterprise customers.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Amazon",
+        "Google"
+      ],
+      "predicted": [
+        "Amazon",
+        "Google"
+      ],
+      "tp": [
+        "Amazon",
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 48,
+      "text_preview": "갤럭시 폰을 사용하다가 아이폰으로 갈아타면 적응하는 데 시간이 걸립니다.",
+      "language": "ko",
+      "difficulty": "hard",
+      "expected": [
+        "Samsung",
+        "Apple"
+      ],
+      "predicted": [
+        "Samsung",
+        "Apple"
+      ],
+      "tp": [
+        "Samsung",
+        "Apple"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 49,
+      "text_preview": "Chrome browser extensions enhance productivity by automating repetitive tasks.",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    },
+    {
+      "id": 50,
+      "text_preview": "Android 15 brings new privacy features and improved app sandboxing for better se...",
+      "language": "en",
+      "difficulty": "hard",
+      "expected": [
+        "Google"
+      ],
+      "predicted": [
+        "Google"
+      ],
+      "tp": [
+        "Google"
+      ],
+      "fp": [],
+      "fn": [],
+      "correct": true
+    }
+  ]
+}

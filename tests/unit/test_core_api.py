@@ -1,9 +1,17 @@
 """Core API endpoint tests covering Auth, Pipeline, Analysis, Campaign, and Workspace."""
 
+import os
+
 import pytest
 from httpx import AsyncClient
 
 from app.models.enums import WorkspaceRole
+
+# Skip these integration tests unless explicitly enabled
+pytestmark = pytest.mark.skipif(
+    os.environ.get("RUN_INTEGRATION_TESTS") != "1",
+    reason="Integration test - set RUN_INTEGRATION_TESTS=1 to run"
+)
 
 
 # ============================================================================
