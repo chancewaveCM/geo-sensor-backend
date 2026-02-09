@@ -78,6 +78,7 @@ class PipelineScheduler:
                 if not due_schedules:
                     return
 
+                # Only log when there are schedules to execute
                 logger.info("Found %d pipeline schedules due for execution", len(due_schedules))
 
                 for schedule in due_schedules:
@@ -112,8 +113,12 @@ class PipelineScheduler:
         # Verify ownership consistency
         if query_set.owner_id != schedule.owner_id:
             logger.error(
-                "Ownership mismatch: schedule %d owner=%d vs query_set %d owner=%d",
-                schedule.id, schedule.owner_id, query_set.id, query_set.owner_id,
+                "CRITICAL: Ownership mismatch detected - disabling schedule. "
+                "schedule_id=%d schedule_owner=%d query_set_id=%d query_set_owner=%d",
+                schedule.id,
+                schedule.owner_id,
+                query_set.id,
+                query_set.owner_id,
             )
             schedule.is_active = False
             await db.commit()
@@ -169,9 +174,10 @@ class PipelineScheduler:
                 ),
             )
 
-            # Update schedule timestamps
+            # Update schedule timestamps and reset failure count on success
             schedule.last_run_at = now
             schedule.next_run_at = now + timedelta(minutes=schedule.interval_minutes)
+            schedule.failure_count = 0
             await db.commit()
 
             logger.info(
@@ -182,12 +188,41 @@ class PipelineScheduler:
             )
 
         except Exception as e:
-            # If job start fails, mark job as failed
+            # Log full exception with traceback
+            logger.exception(
+                "Failed to start scheduled rerun for schedule_id=%d query_set_id=%d",
+                schedule.id,
+                query_set.id,
+            )
+
+            # Mark job as failed
             job.status = PipelineStatus.FAILED
-            job.error_message = f"Failed to start scheduled rerun: {type(e).__name__}: {e}"
+            # Only store exception type in error_message (security)
+            job.error_message = f"Failed to start scheduled rerun: {type(e).__name__}"
             job.completed_at = datetime.now(tz=UTC)
-            # Still update next_run_at to avoid re-polling
-            schedule.next_run_at = now + timedelta(minutes=schedule.interval_minutes)
+
+            # Increment failure count
+            schedule.failure_count += 1
+
+            # Disable schedule after 3 consecutive failures
+            if schedule.failure_count >= 3:
+                logger.error(
+                    "Schedule %d disabled after %d consecutive failures (query_set_id=%d)",
+                    schedule.id,
+                    schedule.failure_count,
+                    query_set.id,
+                )
+                schedule.is_active = False
+            else:
+                # Still retry: update next_run_at for next poll
+                schedule.next_run_at = now + timedelta(minutes=schedule.interval_minutes)
+                logger.warning(
+                    "Schedule %d failure count: %d/3, will retry at %s",
+                    schedule.id,
+                    schedule.failure_count,
+                    schedule.next_run_at,
+                )
+
             await db.commit()
             raise
 

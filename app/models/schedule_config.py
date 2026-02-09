@@ -24,10 +24,11 @@ class ScheduleConfig(Base, TimestampMixin):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     llm_providers: Mapped[list[str]] = mapped_column(JSON, nullable=False)
+    failure_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Foreign Keys
     query_set_id: Mapped[int] = mapped_column(
-        ForeignKey("query_sets.id"), nullable=False, unique=True
+        ForeignKey("query_sets.id", ondelete="CASCADE"), nullable=False, unique=True
     )
     owner_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
 

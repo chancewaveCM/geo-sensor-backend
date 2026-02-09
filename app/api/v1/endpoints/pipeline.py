@@ -1,11 +1,12 @@
 # app/api/v1/endpoints/pipeline.py
 
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -275,7 +276,7 @@ class QuerySetDetailResponse(BaseModel):
 
 class CreateScheduleRequest(BaseModel):
     query_set_id: int
-    interval_minutes: int = Field(..., ge=60, description="Minimum 60 minutes")
+    interval_minutes: int = Field(..., ge=60, le=43200, description="60 min to 30 days")
     llm_providers: list[str] = Field(
         default=["gemini", "openai"],
         min_length=1,
@@ -285,7 +286,7 @@ class CreateScheduleRequest(BaseModel):
 
 
 class UpdateScheduleRequest(BaseModel):
-    interval_minutes: int | None = Field(default=None, ge=60)
+    interval_minutes: int | None = Field(default=None, ge=60, le=43200)
     llm_providers: list[str] | None = Field(default=None, min_length=1, max_length=2)
     is_active: bool | None = None
 
@@ -318,7 +319,7 @@ def _calculate_health_grade(
     data_freshness_hours: float | None,
     consecutive_failures: int,
     total_query_sets: int,
-) -> str:
+) -> Literal["green", "yellow", "red"]:
     """Calculate health grade based on KPI rules."""
     if (
         success_rate_30d < 60
@@ -1244,177 +1245,122 @@ async def get_profile_pipeline_stats(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
 ):
-    """Get pipeline health statistics for each company profile."""
+    """Get pipeline health statistics for each company profile.
+
+    Optimized from 8 queries to 3:
+    1. Profiles + QuerySet counts (LEFT JOIN + GROUP BY)
+    2. Combined job statistics (all-time, 30-day, last runs, avg time)
+    3. Recent 3 jobs for consecutive failures (window function)
+
+    SQLite-compatible (uses julianday). For PostgreSQL, replace with EXTRACT(EPOCH ...).
+    """
     now = datetime.now(tz=UTC)
     thirty_days_ago = now - timedelta(days=30)
 
-    # 1. Get all profiles for user
-    profiles_result = await db.execute(
-        select(CompanyProfile).where(CompanyProfile.owner_id == current_user.id)
-    )
-    profiles = profiles_result.scalars().all()
-
-    if not profiles:
-        return ProfileStatsListResponse(profiles=[], total=0)
-
-    profile_ids = [p.id for p in profiles]
-
-    # 2. Aggregate job stats per profile (single query)
-    job_stats_query = (
-        select(
-            PipelineJob.company_profile_id,
-            func.count(PipelineJob.id).label("total_jobs"),
-            func.sum(
-                case(
-                    (PipelineJob.status == PipelineStatus.COMPLETED, 1),
-                    else_=0,
-                )
-            ).label("completed_jobs"),
-            func.sum(
-                case(
-                    (PipelineJob.status == PipelineStatus.FAILED, 1),
-                    else_=0,
-                )
-            ).label("failed_jobs"),
-        )
-        .where(
-            PipelineJob.company_profile_id.in_(profile_ids),
-            PipelineJob.owner_id == current_user.id,
-        )
-        .group_by(PipelineJob.company_profile_id)
-    )
-    job_stats_result = await db.execute(job_stats_query)
-    job_stats_map = {
-        row.company_profile_id: row
-        for row in job_stats_result.all()
-    }
-
-    # 3. Get 30-day stats per profile (single query)
-    recent_stats_query = (
-        select(
-            PipelineJob.company_profile_id,
-            func.count(PipelineJob.id).label("recent_total"),
-            func.sum(
-                case(
-                    (PipelineJob.status == PipelineStatus.COMPLETED, 1),
-                    else_=0,
-                )
-            ).label("recent_completed"),
-        )
-        .where(
-            PipelineJob.company_profile_id.in_(profile_ids),
-            PipelineJob.owner_id == current_user.id,
-            PipelineJob.status.in_([PipelineStatus.COMPLETED, PipelineStatus.FAILED]),
-            PipelineJob.created_at >= thirty_days_ago,
-        )
-        .group_by(PipelineJob.company_profile_id)
-    )
-    recent_result = await db.execute(recent_stats_query)
-    recent_map = {row.company_profile_id: row for row in recent_result.all()}
-
-    # 4. Get last job per profile (single query using window function)
-    last_job_subq = (
-        select(
-            PipelineJob.company_profile_id,
-            PipelineJob.status,
-            PipelineJob.started_at,
-            PipelineJob.completed_at,
-            func.row_number().over(
-                partition_by=PipelineJob.company_profile_id,
-                order_by=PipelineJob.created_at.desc(),
-            ).label("rn"),
-        )
-        .where(
-            PipelineJob.company_profile_id.in_(profile_ids),
-            PipelineJob.owner_id == current_user.id,
-        )
-        .subquery()
-    )
-    last_jobs_result = await db.execute(
-        select(last_job_subq).where(last_job_subq.c.rn == 1)
-    )
-    last_job_map = {
-        row.company_profile_id: row
-        for row in last_jobs_result.all()
-    }
-
-    # 5. Get last successful completion per profile
-    last_success_subq = (
-        select(
-            PipelineJob.company_profile_id,
-            PipelineJob.completed_at,
-            PipelineJob.started_at,
-            func.row_number().over(
-                partition_by=PipelineJob.company_profile_id,
-                order_by=PipelineJob.completed_at.desc(),
-            ).label("rn"),
-        )
-        .where(
-            PipelineJob.company_profile_id.in_(profile_ids),
-            PipelineJob.owner_id == current_user.id,
-            PipelineJob.status == PipelineStatus.COMPLETED,
-            PipelineJob.completed_at.isnot(None),
-        )
-        .subquery()
-    )
-    last_success_result = await db.execute(
-        select(last_success_subq).where(last_success_subq.c.rn == 1)
-    )
-    last_success_map = {
-        row.company_profile_id: row
-        for row in last_success_result.all()
-    }
-
-    # 6. Count query sets per profile (single query)
-    qs_count_query = (
+    # QUERY 1: Get profiles with QuerySet counts in a single query (LEFT JOIN)
+    qs_count_subq = (
         select(
             QuerySet.company_profile_id,
             func.count(QuerySet.id).label("total_query_sets"),
         )
-        .where(
-            QuerySet.company_profile_id.in_(profile_ids),
-            QuerySet.owner_id == current_user.id,
-        )
+        .where(QuerySet.owner_id == current_user.id)
         .group_by(QuerySet.company_profile_id)
+        .subquery()
     )
-    qs_count_result = await db.execute(qs_count_query)
-    qs_count_map = {
-        row.company_profile_id: row.total_query_sets
-        for row in qs_count_result.all()
-    }
 
-    # 7. Get avg processing time per profile (completed jobs only)
-    avg_time_query = (
+    profiles_result = await db.execute(
+        select(
+            CompanyProfile,
+            func.coalesce(qs_count_subq.c.total_query_sets, 0).label("total_query_sets"),
+        )
+        .outerjoin(qs_count_subq, CompanyProfile.id == qs_count_subq.c.company_profile_id)
+        .where(CompanyProfile.owner_id == current_user.id)
+    )
+    profile_rows = profiles_result.all()
+
+    if not profile_rows:
+        return ProfileStatsListResponse(profiles=[], total=0)
+
+    profile_ids = [row.CompanyProfile.id for row in profile_rows]
+
+    # QUERY 2: Mega-aggregated job statistics (combines 5 previous queries)
+    # All-time stats, 30-day stats, last success timestamp, and avg processing time
+    job_aggregates = (
         select(
             PipelineJob.company_profile_id,
+            # All-time totals
+            func.count(PipelineJob.id).label("total_jobs"),
+            func.sum(
+                case((PipelineJob.status == PipelineStatus.COMPLETED, 1), else_=0)
+            ).label("completed_jobs"),
+            func.sum(
+                case((PipelineJob.status == PipelineStatus.FAILED, 1), else_=0)
+            ).label("failed_jobs"),
+            # 30-day success rate numerator and denominator
+            func.sum(
+                case(
+                    (
+                        (PipelineJob.status.in_([
+                            PipelineStatus.COMPLETED,
+                            PipelineStatus.FAILED
+                        ]))
+                        & (PipelineJob.created_at >= thirty_days_ago),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("recent_total"),
+            func.sum(
+                case(
+                    (
+                        (PipelineJob.status == PipelineStatus.COMPLETED)
+                        & (PipelineJob.created_at >= thirty_days_ago),
+                        1,
+                    ),
+                    else_=0,
+                )
+            ).label("recent_completed"),
+            # Last successful completion timestamp (for data freshness)
+            func.max(
+                case((
+                    PipelineJob.status == PipelineStatus.COMPLETED,
+                    PipelineJob.completed_at
+                ))
+            ).label("last_success_completed_at"),
+            # Average processing time (SQLite julianday, PostgreSQL: EXTRACT(EPOCH ...))
             func.avg(
-                func.julianday(PipelineJob.completed_at) - func.julianday(PipelineJob.started_at)
+                case(
+                    (
+                        (PipelineJob.status == PipelineStatus.COMPLETED)
+                        & (PipelineJob.started_at.isnot(None))
+                        & (PipelineJob.completed_at.isnot(None)),
+                        func.julianday(PipelineJob.completed_at)
+                        - func.julianday(PipelineJob.started_at),
+                    )
+                )
             ).label("avg_days"),
         )
         .where(
             PipelineJob.company_profile_id.in_(profile_ids),
             PipelineJob.owner_id == current_user.id,
-            PipelineJob.status == PipelineStatus.COMPLETED,
-            PipelineJob.started_at.isnot(None),
-            PipelineJob.completed_at.isnot(None),
         )
         .group_by(PipelineJob.company_profile_id)
     )
-    avg_time_result = await db.execute(avg_time_query)
-    avg_time_map = {
-        row.company_profile_id: row.avg_days * 86400 if row.avg_days else None
-        for row in avg_time_result.all()
-    }
+    job_stats_result = await db.execute(job_aggregates)
+    job_stats_map = {row.company_profile_id: row for row in job_stats_result.all()}
 
-    # 8. Get consecutive failures per profile (last 3 jobs)
-    recent_3_query = (
+    # QUERY 3: Last job info + consecutive failures (recent 3 jobs per profile)
+    jobs_window_subq = (
         select(
             PipelineJob.company_profile_id,
             PipelineJob.status,
-            func.row_number().over(
+            PipelineJob.started_at,
+            func.row_number()
+            .over(
                 partition_by=PipelineJob.company_profile_id,
-                order_by=PipelineJob.created_at.desc(),
-            ).label("rn"),
+                order_by=PipelineJob.created_at.desc()
+            )
+            .label("rn"),
         )
         .where(
             PipelineJob.company_profile_id.in_(profile_ids),
@@ -1422,14 +1368,27 @@ async def get_profile_pipeline_stats(
         )
         .subquery()
     )
-    recent_3_result = await db.execute(
-        select(recent_3_query).where(recent_3_query.c.rn <= 3)
+
+    jobs_window_result = await db.execute(
+        select(jobs_window_subq).where(jobs_window_subq.c.rn <= 3)
     )
+
+    # Build maps from window results (last job + consecutive failures)
+    last_job_map: dict[int, any] = {}
     consecutive_failures_map: dict[int, int] = {}
     profile_recent_jobs: dict[int, list] = {}
-    for row in recent_3_result.all():
-        profile_recent_jobs.setdefault(row.company_profile_id, []).append(row.status)
 
+    for row in jobs_window_result.all():
+        pid = row.company_profile_id
+
+        # First row (rn=1) is the most recent job
+        if row.rn == 1:
+            last_job_map[pid] = row
+
+        # Collect statuses for consecutive failure calculation
+        profile_recent_jobs.setdefault(pid, []).append(row.status)
+
+    # Calculate consecutive failures (count from most recent until first non-failure)
     for pid, statuses in profile_recent_jobs.items():
         count = 0
         for s in statuses:
@@ -1439,22 +1398,24 @@ async def get_profile_pipeline_stats(
                 break
         consecutive_failures_map[pid] = count
 
-    # 9. Build response from maps
+    # Build response from collected data (Python-side aggregation)
     stats_list = []
-    for profile in profiles:
+    for row in profile_rows:
+        profile = row.CompanyProfile
         pid = profile.id
 
+        # Extract from combined job stats
         job_stats = job_stats_map.get(pid)
         total_jobs = job_stats.total_jobs if job_stats else 0
         completed_jobs = job_stats.completed_jobs if job_stats else 0
         failed_jobs = job_stats.failed_jobs if job_stats else 0
 
-        recent = recent_map.get(pid)
-        if recent and recent.recent_total:
-            success_rate_30d = (recent.recent_completed or 0) / recent.recent_total * 100
-        else:
-            success_rate_30d = 0.0
+        # 30-day success rate
+        success_rate_30d = 0.0
+        if job_stats and job_stats.recent_total:
+            success_rate_30d = (job_stats.recent_completed or 0) / job_stats.recent_total * 100
 
+        # Last job status and timestamp
         last_job = last_job_map.get(pid)
         last_run_status = None
         last_run_at = None
@@ -1465,13 +1426,22 @@ async def get_profile_pipeline_stats(
             )
             last_run_at = last_job.started_at
 
-        last_success = last_success_map.get(pid)
+        # Data freshness from aggregated last success timestamp
         data_freshness_hours = None
-        if last_success and last_success.completed_at:
-            data_freshness_hours = (now - last_success.completed_at).total_seconds() / 3600
+        if job_stats and job_stats.last_success_completed_at:
+            data_freshness_hours = (
+                now - job_stats.last_success_completed_at
+            ).total_seconds() / 3600
 
-        total_query_sets = qs_count_map.get(pid, 0)
-        avg_processing_time = avg_time_map.get(pid)
+        # Average processing time (convert days to seconds)
+        avg_processing_time = None
+        if job_stats and job_stats.avg_days:
+            avg_processing_time = job_stats.avg_days * 86400
+
+        # Query sets from joined query
+        total_query_sets = row.total_query_sets or 0
+
+        # Consecutive failures
         consecutive_failures = consecutive_failures_map.get(pid, 0)
 
         health_grade = _calculate_health_grade(
@@ -1556,7 +1526,14 @@ async def create_schedule(
         owner_id=current_user.id,
     )
     db.add(schedule)
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A schedule already exists for this QuerySet",
+        )
     await db.refresh(schedule)
 
     return ScheduleConfigResponse(
@@ -1641,16 +1618,12 @@ async def update_schedule(
 
     if request.interval_minutes is not None:
         schedule.interval_minutes = request.interval_minutes
-        # Recalculate next_run_at based on new interval
+        # Policy: Always calculate next_run_at as current time + new interval.
+        # This ensures users see immediate effect when changing interval.
         now = datetime.now(tz=UTC)
-        if schedule.last_run_at:
-            schedule.next_run_at = schedule.last_run_at + timedelta(
-                minutes=request.interval_minutes
-            )
-        else:
-            schedule.next_run_at = now + timedelta(
-                minutes=request.interval_minutes
-            )
+        schedule.next_run_at = now + timedelta(
+            minutes=request.interval_minutes
+        )
 
     if request.llm_providers is not None:
         _validate_llm_providers(request.llm_providers)

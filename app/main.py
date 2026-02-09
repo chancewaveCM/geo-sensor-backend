@@ -79,12 +79,13 @@ async def lifespan(app: FastAPI):
             logger.info("No stuck pipeline jobs found on startup")
 
     # Start campaign scheduler in background
-    scheduler = get_scheduler(poll_interval_seconds=300)  # 5 min interval
+    interval = settings.PIPELINE_SCHEDULER_INTERVAL_SECONDS
+    scheduler = get_scheduler(poll_interval_seconds=interval)
     scheduler_task = asyncio.create_task(scheduler.start())
     logger.info("Campaign scheduler started")
 
     # Start pipeline scheduler in background
-    pipeline_scheduler = get_pipeline_scheduler(poll_interval_seconds=300)  # 5 min interval
+    pipeline_scheduler = get_pipeline_scheduler(poll_interval_seconds=interval)
     pipeline_scheduler_task = asyncio.create_task(pipeline_scheduler.start())
     logger.info("Pipeline scheduler started")
 
