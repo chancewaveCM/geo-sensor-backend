@@ -1320,8 +1320,6 @@ async def get_profile_pipeline_stats(
 ):
     """Get pipeline health statistics for each company profile.
 
-    _add_sunset_headers(response)
-
     Optimized from 8 queries to 3:
     1. Profiles + QuerySet counts (LEFT JOIN + GROUP BY)
     2. Combined job statistics (all-time, 30-day, last runs, avg time)
@@ -1329,6 +1327,7 @@ async def get_profile_pipeline_stats(
 
     SQLite-compatible (uses julianday). For PostgreSQL, replace with EXTRACT(EPOCH ...).
     """
+    _add_sunset_headers(response)
     now = datetime.now(tz=UTC)
     thirty_days_ago = now - timedelta(days=30)
 

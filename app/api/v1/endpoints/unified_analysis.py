@@ -5,10 +5,11 @@ Replaces the old generated-queries + pipeline two-step workflow.
 """
 
 import logging
+import time
 from datetime import UTC, datetime
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -163,14 +164,20 @@ async def start_analysis(
     # Build services and start background job
     orchestrator, bg_db = _build_pipeline_services(request.llm_providers)
     try:
+        async def _run_with_cleanup():
+            try:
+                await orchestrator.start_pipeline(
+                    job_id=job.id,
+                    company_profile_id=profile.id,
+                    query_set_id=query_set.id,
+                    is_rerun=False,
+                )
+            finally:
+                await bg_db.close()
+
         await BackgroundJobManager.start_job(
             job.id,
-            orchestrator.start_pipeline(
-                job_id=job.id,
-                company_profile_id=profile.id,
-                query_set_id=query_set.id,
-                is_rerun=False,
-            ),
+            _run_with_cleanup(),
         )
     except Exception:
         await bg_db.close()
@@ -195,8 +202,8 @@ async def list_analysis_jobs(
     current_user: Annotated[User, Depends(get_current_user)],
     mode: str | None = None,
     company_profile_id: int | None = None,
-    limit: int = 20,
-    offset: int = 0,
+    limit: int = Query(default=20, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
 ):
     """List unified analysis jobs (mode='quick' or 'advanced')."""
     query = select(PipelineJob).where(
@@ -431,10 +438,8 @@ async def rerun_query(
             detail="Query not found",
         )
 
-    # Delete existing responses for this query
-    for resp in query.raw_responses:
-        await db.delete(resp)
-    await db.commit()
+    # Collect old response IDs but don't delete yet
+    old_response_ids = [resp.id for resp in query.raw_responses]
 
     # Re-execute the query
     def _get_api_key(provider: LLMProvider) -> str:
@@ -448,7 +453,6 @@ async def rerun_query(
         provider = LLMProvider(provider_str)
         llm = LLMFactory.create(provider, _get_api_key(provider))
         try:
-            import time
             start_time = time.time()
             response = await llm.generate(query.text, max_tokens=2048)
             latency = (time.time() - start_time) * 1000
@@ -474,6 +478,12 @@ async def rerun_query(
                 error_message=str(e),
             )
             db.add(raw_response)
+
+    # Delete old responses after successful new ones
+    for resp_id in old_response_ids:
+        old_resp = await db.get(RawLLMResponse, resp_id)
+        if old_resp:
+            await db.delete(old_resp)
 
     query.status = "completed"
     await db.commit()
