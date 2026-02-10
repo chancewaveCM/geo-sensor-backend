@@ -101,7 +101,7 @@ async def generate_queries(
     # Gemini API 호출
     llm = LLMFactory.create(LLMProvider.GEMINI, settings.GEMINI_API_KEY)
     try:
-        response = await llm.generate(prompt)
+        response = await llm.generate(prompt, max_tokens=4096)
         response_text = response.content  # LLMResponse 객체에서 content 추출
     except Exception as e:
         logger.error(f"LLM service error: {e}")

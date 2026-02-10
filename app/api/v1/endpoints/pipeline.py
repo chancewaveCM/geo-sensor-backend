@@ -471,7 +471,7 @@ async def start_pipeline(
 
     return StartPipelineResponse(
         job_id=job.id,
-        status=job.status.value,
+        status=job.status,
         message="Pipeline job created and started",
         estimated_queries=estimated,
     )
@@ -514,7 +514,7 @@ async def get_job_status(
     # Those fields are on QuerySet now, not PipelineJob
     return PipelineJobStatusResponse(
         id=job.id,
-        status=job.status.value,
+        status=job.status,
         company_profile_id=job.company_profile_id,
         query_set_id=job.query_set_id,
         llm_providers=job.llm_providers,
@@ -569,7 +569,7 @@ async def list_jobs(
         jobs=[
             PipelineJobSummary(
                 id=j.id,
-                status=j.status.value,
+                status=j.status,
                 company_profile_id=j.company_profile_id,
                 company_name=j.company_profile.name if j.company_profile else None,
                 query_set_id=j.query_set_id,
@@ -615,7 +615,7 @@ async def cancel_job(
     if job.status in [PipelineStatus.COMPLETED, PipelineStatus.FAILED, PipelineStatus.CANCELLED]:
         return CancelJobResponse(
             job_id=job.id,
-            status=job.status.value,
+            status=job.status,
             message="Job already finished",
         )
 
@@ -627,7 +627,7 @@ async def cancel_job(
 
     return CancelJobResponse(
         job_id=job.id,
-        status=job.status.value,
+        status=job.status,
         message="Job cancelled successfully" if cancelled else "Job marked as cancelled",
     )
 
@@ -727,7 +727,7 @@ async def get_queries(
                 id=q.id,
                 text=q.text,
                 order_index=q.order_index,
-                status=q.status.value,
+                status=q.status,
                 category_id=q.category_id,
                 response_count=len(q.raw_responses),
             )
@@ -864,7 +864,7 @@ async def rerun_query_set(
 
     return StartPipelineResponse(
         job_id=job.id,
-        status=job.status.value,
+        status=job.status,
         message="Re-run pipeline job created and started",
         estimated_queries=estimated,
     )
@@ -905,7 +905,7 @@ async def get_query_set_history(
         executions=[
             QuerySetHistoryItem(
                 job_id=j.id,
-                status=j.status.value,
+                status=j.status,
                 completed_queries=j.completed_queries,
                 failed_queries=j.failed_queries,
                 started_at=j.started_at,
@@ -1001,7 +1001,7 @@ async def list_query_sets(
                 company_profile_id=row.QuerySet.company_profile_id,
                 created_at=row.QuerySet.created_at,
                 job_count=row.job_count or 0,
-                last_job_status=row.last_job_status.value if row.last_job_status else None,
+                last_job_status=row.last_job_status if row.last_job_status else None,
                 last_run_at=row.last_run_at,
                 total_responses=row.total_responses or 0,
             )
@@ -1057,7 +1057,7 @@ async def get_query_set_detail(
         latest_job = sorted(query_set.pipeline_jobs, key=lambda j: j.created_at, reverse=True)[0]
         last_job = QuerySetDetailJobItem(
             id=latest_job.id,
-            status=latest_job.status.value,
+            status=latest_job.status,
             llm_providers=latest_job.llm_providers,
             total_queries=latest_job.total_queries,
             completed_queries=latest_job.completed_queries,
@@ -1262,7 +1262,7 @@ async def get_category_queries(
                 id=q.id,
                 text=q.text,
                 order_index=q.order_index,
-                status=q.status.value,
+                status=q.status,
                 category_id=q.category_id,
                 response_count=len(q.raw_responses),
             )
@@ -1452,10 +1452,7 @@ async def get_profile_pipeline_stats(
         last_run_status = None
         last_run_at = None
         if last_job:
-            last_run_status = (
-                last_job.status if isinstance(last_job.status, str)
-                else last_job.status.value
-            )
+            last_run_status = last_job.status
             last_run_at = last_job.started_at
 
         # Data freshness from aggregated last success timestamp
