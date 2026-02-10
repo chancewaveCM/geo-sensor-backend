@@ -179,13 +179,27 @@ async def upload_avatar(
             detail="Avatar image must be less than 2MB",
         )
 
-    # Validate base64
+    # Validate base64 and magic bytes
     try:
         decoded = base64.b64decode(avatar_in.avatar_data, validate=True)
         if len(decoded) > 2 * 1024 * 1024:  # 2MB limit
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Avatar image must be less than 2MB",
+            )
+
+        # Validate magic bytes
+        allowed_magic = {
+            b'\x89PNG': 'image/png',
+            b'\xff\xd8\xff': 'image/jpeg',
+            b'GIF87': 'image/gif',
+            b'GIF89': 'image/gif',
+            b'RIFF': 'image/webp',
+        }
+        if not any(decoded.startswith(magic) for magic in allowed_magic):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="지원하지 않는 이미지 형식입니다",
             )
     except Exception as exc:
         if isinstance(exc, HTTPException):

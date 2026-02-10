@@ -75,7 +75,7 @@ async def _analyze_content(text: str, target_brand: str, provider: str) -> Diagn
     llm = LLMFactory.create(LLMProvider(provider), _get_api_key(provider))
 
     # Sanitize inputs to mitigate prompt injection
-    sanitized_brand = target_brand.replace("\n", " ").strip()[:255]
+    sanitized_brand = re.sub(r'[^\w\s\-\uAC00-\uD7A3]', '', target_brand)[:100].strip()
     sanitized_text = text[:10000]
 
     prompt = f"""Analyze the following content for AI citation optimization potential.
@@ -184,8 +184,15 @@ async def analyze_url(
             if resp.is_redirect:
                 location = resp.headers.get("location", "")
                 if location:
+                    # Re-validate redirect location before following
                     validate_url(location)
                     resp = await client.get(location, follow_redirects=False)
+                    # If redirected again, validate again
+                    if resp.is_redirect:
+                        second_location = resp.headers.get("location", "")
+                        if second_location:
+                            validate_url(second_location)
+                            resp = await client.get(second_location, follow_redirects=False)
             resp.raise_for_status()
             # Check content-length to prevent OOM
             content_length = resp.headers.get("content-length")
@@ -229,7 +236,7 @@ async def suggest_improvements(
     )
 
     # Sanitize inputs to mitigate prompt injection
-    sanitized_brand = request.target_brand.replace("\n", " ").strip()[:255]
+    sanitized_brand = re.sub(r'[^\w\s\-\uAC00-\uD7A3]', '', request.target_brand)[:100].strip()
     sanitized_text = request.text[:10000]
 
     prompt = f"""Generate optimization suggestions to improve AI citation \
@@ -299,7 +306,7 @@ async def compare_content(
     )
 
     # Sanitize inputs to mitigate prompt injection
-    sanitized_brand = request.target_brand.replace("\n", " ").strip()[:255]
+    sanitized_brand = re.sub(r'[^\w\s\-\uAC00-\uD7A3]', '', request.target_brand)[:100].strip()
     sanitized_original = request.original_text[:5000]
     sanitized_optimized = request.optimized_text[:5000]
 
