@@ -1,5 +1,7 @@
 """Authentication endpoints."""
 
+import base64
+import json
 import re
 from datetime import timedelta
 from typing import Annotated
@@ -11,15 +13,23 @@ from slowapi.util import get_remote_address
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_password_hash, verify_password
 from app.models.enums import WorkspaceRole
 from app.models.workspace import Workspace, WorkspaceMember
 from app.schemas.token import Token
-from app.schemas.user import UserCreate, UserResponse
+from app.schemas.user import (
+    AvatarUploadRequest,
+    PasswordChangeRequest,
+    UserCreate,
+    UserProfileUpdate,
+    UserResponse,
+)
 from app.services import user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
+
+PROFILE_MUTABLE_FIELDS = {"full_name", "avatar_url", "notification_preferences"}
 
 
 @router.post("/login", response_model=Token)
@@ -96,3 +106,110 @@ async def get_current_user_info(
 ) -> UserResponse:
     """Get current user info."""
     return UserResponse.model_validate(current_user)
+
+
+@router.patch("/me", response_model=UserResponse)
+@limiter.limit("10/minute")
+async def update_profile(
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+    profile_in: UserProfileUpdate,
+) -> UserResponse:
+    """Update current user profile."""
+    update_data = profile_in.model_dump(exclude_unset=True)
+
+    # If notification_preferences is a dict, convert to JSON string
+    if "notification_preferences" in update_data:
+        notif_prefs = update_data["notification_preferences"]
+        if isinstance(notif_prefs, dict):
+            update_data["notification_preferences"] = json.dumps(notif_prefs)
+
+    # Filter to only mutable fields
+    update_data = {k: v for k, v in update_data.items() if k in PROFILE_MUTABLE_FIELDS}
+
+    for field, value in update_data.items():
+        setattr(current_user, field, value)
+
+    await db.commit()
+    await db.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.post("/change-password", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
+async def change_password(
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+    password_in: PasswordChangeRequest,
+) -> dict:
+    """Change current user password."""
+    if not verify_password(password_in.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect",
+        )
+
+    if verify_password(password_in.new_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+
+    current_user.hashed_password = get_password_hash(password_in.new_password)
+    await db.commit()
+    return {"message": "Password changed successfully"}
+
+
+@router.post("/me/avatar", response_model=UserResponse)
+@limiter.limit("5/minute")
+async def upload_avatar(
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+    avatar_in: AvatarUploadRequest,
+) -> UserResponse:
+    """Upload avatar as Base64 (MVP: stored directly in DB)."""
+    # Check base64 string length before decoding (base64 is ~33% larger than binary)
+    max_base64_len = int(2 * 1024 * 1024 * 1.34)  # ~2.68MB for 2MB binary
+    if len(avatar_in.avatar_data) > max_base64_len:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Avatar image must be less than 2MB",
+        )
+
+    # Validate base64
+    try:
+        decoded = base64.b64decode(avatar_in.avatar_data, validate=True)
+        if len(decoded) > 2 * 1024 * 1024:  # 2MB limit
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Avatar image must be less than 2MB",
+            )
+    except Exception as exc:
+        if isinstance(exc, HTTPException):
+            raise
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid base64 image data",
+        ) from exc
+
+    # Store as data URI
+    current_user.avatar_url = f"data:{avatar_in.content_type};base64,{avatar_in.avatar_data}"
+    await db.commit()
+    await db.refresh(current_user)
+    return UserResponse.model_validate(current_user)
+
+
+@router.delete("/me", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
+async def delete_account(
+    request: Request,
+    db: DbSession,
+    current_user: CurrentUser,
+) -> dict:
+    """Soft delete current user account (set is_active=False)."""
+    current_user.is_active = False
+    await db.commit()
+    return {"message": "Account deactivated successfully"}
