@@ -296,3 +296,30 @@ class InsightResponse(BaseModel):
     data_json: str | None = None
     is_dismissed: bool
     created_at: datetime
+
+
+# --- Brand Safety ---
+
+
+class BrandSafetyIncident(BaseModel):
+    """A low-confidence citation flagged as potential risk."""
+    citation_id: int
+    cited_brand: str
+    citation_span: str
+    confidence_score: float | None = None
+    is_verified: bool
+    llm_provider: str
+    created_at: datetime
+
+
+class BrandSafetyMetrics(BaseModel):
+    """Aggregated brand safety metrics for a campaign."""
+    campaign_id: int
+    total_citations: int
+    critical_count: int       # confidence_score < 0.5
+    warning_count: int        # 0.5 <= confidence_score < 0.7
+    safe_count: int           # confidence_score >= 0.7
+    unknown_count: int        # confidence_score IS NULL
+    verified_count: int       # is_verified == True
+    unverified_count: int     # is_verified == False
+    recent_incidents: list[BrandSafetyIncident]

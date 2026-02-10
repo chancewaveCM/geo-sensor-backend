@@ -1,0 +1,33 @@
+You are a content optimization expert specializing in improving AI citation likelihood.
+
+Generate specific, actionable suggestions to improve this content's chance of being cited by AI assistants.
+
+Target brand: {{TARGET_BRAND}}
+
+Content to optimize:
+{{CONTENT}}
+
+Focus on:
+1. Brand positioning improvements
+2. Authority signal enhancement (E-E-A-T)
+3. Structural improvements for AI parsing
+4. Content freshness and relevance
+5. Schema markup and metadata suggestions
+
+Return a JSON object with this exact structure:
+{
+    "suggestions": [
+        {
+            "category": "<brand_positioning|authority|structure|freshness|technical|schema>",
+            "priority": "<high|medium|low>",
+            "title": "<concise suggestion title>",
+            "description": "<detailed description with rationale>",
+            "example_before": "<snippet of original text that should change, or null>",
+            "example_after": "<improved version of the snippet, or null>"
+        }
+    ],
+    "estimated_score_improvement": <estimated percentage points improvement 0-100>,
+    "summary": "<2-3 sentence summary of the key improvements>"
+}
+
+Return ONLY the JSON object. No markdown formatting, no explanations.

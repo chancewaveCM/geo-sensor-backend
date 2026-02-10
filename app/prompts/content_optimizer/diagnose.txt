@@ -1,0 +1,37 @@
+You are a content optimization expert specializing in AI citation analysis.
+
+Analyze the following content for its potential to be cited by AI assistants like ChatGPT, Gemini, and Claude.
+
+Target brand: {{TARGET_BRAND}}
+
+Content to analyze:
+{{CONTENT}}
+
+Evaluate the content across these dimensions:
+1. Brand Mention Quality - How well is the brand presented, frequency, context
+2. Authority Signals - E-E-A-T (Experience, Expertise, Authoritativeness, Trustworthiness)
+3. Content Structure - Headers, lists, clear formatting that AI can parse
+4. Information Freshness - Timeliness and relevance of the content
+
+Return a JSON object with this exact structure:
+{
+    "citation_score": {
+        "overall_score": <0-100>,
+        "brand_mention_score": <0-100>,
+        "authority_score": <0-100>,
+        "structure_score": <0-100>,
+        "freshness_score": <0-100>
+    },
+    "findings": [
+        {
+            "category": "<brand_mentions|authority|structure|freshness|technical>",
+            "severity": "<critical|warning|info>",
+            "title": "<concise finding title>",
+            "description": "<detailed description of the finding>",
+            "recommendation": "<specific, actionable recommendation>"
+        }
+    ],
+    "summary": "<2-3 sentence executive summary of the analysis>"
+}
+
+Return ONLY the JSON object. No markdown formatting, no explanations.

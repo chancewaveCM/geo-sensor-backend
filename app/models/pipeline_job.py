@@ -27,6 +27,11 @@ class PipelineJob(Base, TimestampMixin):
     # ["gemini", "openai"]
     llm_providers: Mapped[list[str]] = mapped_column(sa.JSON, nullable=False)
 
+    # Analysis mode: 'pipeline' (legacy), 'quick', 'advanced'
+    mode: Mapped[str] = mapped_column(
+        sa.String(20), default="pipeline", server_default="pipeline"
+    )
+
     # Status tracking
     status: Mapped[str] = mapped_column(
         sa.String(50), default=PipelineStatus.PENDING.value

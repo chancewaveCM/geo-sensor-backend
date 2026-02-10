@@ -30,6 +30,8 @@ from app.models.run_citation import RunCitation
 from app.schemas.campaign import (
     BrandRankingItem,
     BrandRankingResponse,
+    BrandSafetyIncident,
+    BrandSafetyMetrics,
     CampaignCompanyCreate,
     CampaignCompanyResponse,
     CampaignCompanyUpdate,
@@ -1074,6 +1076,162 @@ async def export_campaign_csv(
             "Content-Disposition": f"attachment; filename=campaign_{campaign_id}_export.csv"
         },
     )
+
+
+@router.get(
+    "/{campaign_id}/brand-safety",
+    response_model=BrandSafetyMetrics,
+)
+async def get_brand_safety_metrics(
+    db: DbSession,
+    workspace_id: int,
+    campaign_id: int,
+    member: WorkspaceMemberDep,
+) -> BrandSafetyMetrics:
+    """Get brand safety risk aggregation for a campaign."""
+    await _get_campaign_or_404(db, workspace_id, campaign_id)
+
+    try:
+        # Total citations count
+        total_cit_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(CampaignRun.campaign_id == campaign_id)
+        )
+        total_citations = total_cit_result.scalar() or 0
+
+        # Critical: confidence_score < 0.5
+        critical_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunCitation.confidence_score.is_not(None),
+                RunCitation.confidence_score < 0.5,
+            )
+        )
+        critical_count = critical_result.scalar() or 0
+
+        # Warning: 0.5 <= confidence_score < 0.7
+        warning_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunCitation.confidence_score.is_not(None),
+                RunCitation.confidence_score >= 0.5,
+                RunCitation.confidence_score < 0.7,
+            )
+        )
+        warning_count = warning_result.scalar() or 0
+
+        # Safe: confidence_score >= 0.7
+        safe_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunCitation.confidence_score.is_not(None),
+                RunCitation.confidence_score >= 0.7,
+            )
+        )
+        safe_count = safe_result.scalar() or 0
+
+        # Unknown: confidence_score IS NULL
+        unknown_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunCitation.confidence_score.is_(None),
+            )
+        )
+        unknown_count = unknown_result.scalar() or 0
+
+        # Verified count
+        verified_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunCitation.is_verified.is_(True),
+            )
+        )
+        verified_count = verified_result.scalar() or 0
+
+        # Unverified count
+        unverified_result = await db.execute(
+            select(func.count(RunCitation.id))
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                RunCitation.is_verified.is_(False),
+            )
+        )
+        unverified_count = unverified_result.scalar() or 0
+
+        # Recent incidents: last 20 citations with confidence < 0.7 OR NULL
+        incidents_result = await db.execute(
+            select(
+                RunCitation.id,
+                RunCitation.cited_brand,
+                RunCitation.citation_span,
+                RunCitation.confidence_score,
+                RunCitation.is_verified,
+                RunCitation.created_at,
+                RunResponse.llm_provider,
+            )
+            .join(RunResponse, RunCitation.run_response_id == RunResponse.id)
+            .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
+            .where(
+                CampaignRun.campaign_id == campaign_id,
+                (
+                    RunCitation.confidence_score.is_(None)
+                    | (RunCitation.confidence_score < 0.7)
+                ),
+            )
+            .order_by(RunCitation.created_at.desc())
+            .limit(20)
+        )
+        incidents_rows = incidents_result.all()
+
+        recent_incidents = [
+            BrandSafetyIncident(
+                citation_id=row.id,
+                cited_brand=row.cited_brand,
+                citation_span=row.citation_span,
+                confidence_score=row.confidence_score,
+                is_verified=row.is_verified,
+                llm_provider=row.llm_provider,
+                created_at=row.created_at,
+            )
+            for row in incidents_rows
+        ]
+
+        return BrandSafetyMetrics(
+            campaign_id=campaign_id,
+            total_citations=total_citations,
+            critical_count=critical_count,
+            warning_count=warning_count,
+            safe_count=safe_count,
+            unknown_count=unknown_count,
+            verified_count=verified_count,
+            unverified_count=unverified_count,
+            recent_incidents=recent_incidents,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to retrieve brand safety metrics: {e!s}",
+        )
 
 
 # ---------------------------------------------------------------------------
