@@ -67,9 +67,22 @@ class UserResponse(UserBase):
 
 
 class UserProfileUpdate(BaseModel):
-    full_name: str | None = None
+    full_name: str | None = Field(None, max_length=255)
     avatar_url: str | None = None
-    notification_preferences: str | None = None  # JSON string
+    notification_preferences: str | None = Field(default=None, max_length=4096)
+
+    @field_validator("notification_preferences")
+    @classmethod
+    def validate_notification_json(cls, v: str | None) -> str | None:
+        if v is None:
+            return None
+        try:
+            parsed = json.loads(v)
+            if not isinstance(parsed, dict):
+                raise ValueError("Must be a JSON object")
+        except (json.JSONDecodeError, TypeError) as e:
+            raise ValueError("Invalid JSON string") from e
+        return v
 
 
 class PasswordChangeRequest(BaseModel):

@@ -15,7 +15,7 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("users", sa.Column("avatar_url", sa.String(1024), nullable=True))
+    op.add_column("users", sa.Column("avatar_url", sa.Text(), nullable=True))
     op.add_column("users", sa.Column("notification_preferences", sa.Text(), nullable=True))
 
 

@@ -1,5 +1,7 @@
 """Authentication endpoints."""
 
+import base64
+import json
 import re
 from datetime import timedelta
 from typing import Annotated
@@ -26,6 +28,8 @@ from app.services import user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
+
+PROFILE_MUTABLE_FIELDS = {"full_name", "avatar_url", "notification_preferences"}
 
 
 @router.post("/login", response_model=Token)
@@ -105,14 +109,14 @@ async def get_current_user_info(
 
 
 @router.patch("/me", response_model=UserResponse)
+@limiter.limit("10/minute")
 async def update_profile(
+    request: Request,
     db: DbSession,
     current_user: CurrentUser,
     profile_in: UserProfileUpdate,
 ) -> UserResponse:
     """Update current user profile."""
-    import json
-
     update_data = profile_in.model_dump(exclude_unset=True)
 
     # If notification_preferences is a dict, convert to JSON string
@@ -120,6 +124,9 @@ async def update_profile(
         notif_prefs = update_data["notification_preferences"]
         if isinstance(notif_prefs, dict):
             update_data["notification_preferences"] = json.dumps(notif_prefs)
+
+    # Filter to only mutable fields
+    update_data = {k: v for k, v in update_data.items() if k in PROFILE_MUTABLE_FIELDS}
 
     for field, value in update_data.items():
         setattr(current_user, field, value)
@@ -130,7 +137,9 @@ async def update_profile(
 
 
 @router.post("/change-password", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     db: DbSession,
     current_user: CurrentUser,
     password_in: PasswordChangeRequest,
@@ -142,23 +151,37 @@ async def change_password(
             detail="Current password is incorrect",
         )
 
+    if verify_password(password_in.new_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must be different from current password",
+        )
+
     current_user.hashed_password = get_password_hash(password_in.new_password)
     await db.commit()
     return {"message": "Password changed successfully"}
 
 
 @router.post("/me/avatar", response_model=UserResponse)
+@limiter.limit("5/minute")
 async def upload_avatar(
+    request: Request,
     db: DbSession,
     current_user: CurrentUser,
     avatar_in: AvatarUploadRequest,
 ) -> UserResponse:
     """Upload avatar as Base64 (MVP: stored directly in DB)."""
-    import base64
+    # Check base64 string length before decoding (base64 is ~33% larger than binary)
+    max_base64_len = int(2 * 1024 * 1024 * 1.34)  # ~2.68MB for 2MB binary
+    if len(avatar_in.avatar_data) > max_base64_len:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Avatar image must be less than 2MB",
+        )
 
     # Validate base64
     try:
-        decoded = base64.b64decode(avatar_in.avatar_data)
+        decoded = base64.b64decode(avatar_in.avatar_data, validate=True)
         if len(decoded) > 2 * 1024 * 1024:  # 2MB limit
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -180,7 +203,9 @@ async def upload_avatar(
 
 
 @router.delete("/me", status_code=status.HTTP_200_OK)
+@limiter.limit("3/minute")
 async def delete_account(
+    request: Request,
     db: DbSession,
     current_user: CurrentUser,
 ) -> dict:
