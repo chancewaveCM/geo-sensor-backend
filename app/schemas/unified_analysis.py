@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class StartAnalysisRequest(BaseModel):
@@ -24,6 +24,13 @@ class StartAnalysisRequest(BaseModel):
     # Advanced mode options
     category_count: int | None = Field(default=None, ge=1, le=20)
     queries_per_category: int | None = Field(default=None, ge=1, le=20)
+
+    @field_validator("llm_providers")
+    @classmethod
+    def validate_unique_providers(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("llm_providers must not contain duplicates")
+        return value
 
 
 class AnalysisJobResponse(BaseModel):
@@ -83,6 +90,13 @@ class RerunQueryRequest(BaseModel):
         min_length=1,
         max_length=2,
     )
+
+    @field_validator("llm_providers")
+    @classmethod
+    def validate_unique_rerun_providers(cls, value: list[str]) -> list[str]:
+        if len(value) != len(set(value)):
+            raise ValueError("llm_providers must not contain duplicates")
+        return value
 
 
 class QueryResponse(BaseModel):

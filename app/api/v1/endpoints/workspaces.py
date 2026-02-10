@@ -100,28 +100,36 @@ async def list_my_workspaces(
     current_user: CurrentUser,
 ) -> list[WorkspaceResponse]:
     """List all workspaces where current user is a member."""
-    result = await db.execute(
-        select(WorkspaceMember)
-        .options(selectinload(WorkspaceMember.workspace))
-        .where(WorkspaceMember.user_id == current_user.id)
+    member_count_subquery = (
+        select(
+            WorkspaceMember.workspace_id.label("workspace_id"),
+            func.count(WorkspaceMember.id).label("member_count"),
+        )
+        .group_by(WorkspaceMember.workspace_id)
+        .subquery()
     )
-    members = result.scalars().all()
+
+    result = await db.execute(
+        select(
+            WorkspaceMember.role,
+            Workspace,
+            func.coalesce(member_count_subquery.c.member_count, 0).label("member_count"),
+        )
+        .join(Workspace, Workspace.id == WorkspaceMember.workspace_id)
+        .outerjoin(
+            member_count_subquery,
+            member_count_subquery.c.workspace_id == Workspace.id,
+        )
+        .where(WorkspaceMember.user_id == current_user.id)
+        .order_by(Workspace.created_at.desc())
+    )
+    rows = result.all()
 
     responses = []
-    for member in members:
-        workspace = member.workspace
-
-        # Count members
-        count_result = await db.execute(
-            select(func.count(WorkspaceMember.id)).where(
-                WorkspaceMember.workspace_id == workspace.id
-            )
-        )
-        member_count = count_result.scalar() or 0
-
+    for role, workspace, member_count in rows:
         response = WorkspaceResponse.model_validate(workspace)
         response.member_count = member_count
-        response.my_role = member.role
+        response.my_role = role
         responses.append(response)
 
     return responses

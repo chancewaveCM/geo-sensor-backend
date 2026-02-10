@@ -8,6 +8,7 @@ import json
 import logging
 import re
 from typing import Annotated
+from urllib.parse import urljoin
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -32,7 +33,7 @@ from app.schemas.content_optimizer import (
     SuggestResult,
 )
 from app.services.llm.factory import LLMFactory
-from app.utils.ssrf_guard import validate_url
+from app.utils.ssrf_guard import validate_url_async
 
 logger = logging.getLogger(__name__)
 
@@ -174,25 +175,32 @@ async def analyze_url(
     Fetches the URL content (with SSRF protection) and analyzes it.
     """
     # Validate URL against SSRF
-    validate_url(request.url)
+    await validate_url_async(request.url)
 
     # Fetch URL content
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(request.url, follow_redirects=False)
-            # If redirect, validate target URL too
-            if resp.is_redirect:
+            current_url = request.url
+            max_redirects = 3
+
+            for _ in range(max_redirects + 1):
+                resp = await client.get(current_url, follow_redirects=False)
+                if not resp.is_redirect:
+                    break
+
                 location = resp.headers.get("location", "")
-                if location:
-                    # Re-validate redirect location before following
-                    validate_url(location)
-                    resp = await client.get(location, follow_redirects=False)
-                    # If redirected again, validate again
-                    if resp.is_redirect:
-                        second_location = resp.headers.get("location", "")
-                        if second_location:
-                            validate_url(second_location)
-                            resp = await client.get(second_location, follow_redirects=False)
+                if not location:
+                    break
+
+                next_url = urljoin(str(resp.url), location)
+                await validate_url_async(next_url)
+                current_url = next_url
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Too many redirects (max {max_redirects})",
+                )
+
             resp.raise_for_status()
             # Check content-length to prevent OOM
             content_length = resp.headers.get("content-length")

@@ -10,6 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordRequestForm
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 
 from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
@@ -30,6 +32,24 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 limiter = Limiter(key_func=get_remote_address)
 
 PROFILE_MUTABLE_FIELDS = {"full_name", "avatar_url", "notification_preferences"}
+
+
+def _generate_workspace_slug(name: str) -> str:
+    slug = re.sub(r"[^\w\s-]", "", name.lower().strip())
+    slug = re.sub(r"[\s_]+", "-", slug)
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    return slug or "workspace"
+
+
+async def _ensure_unique_workspace_slug(db: DbSession, base_slug: str) -> str:
+    slug = base_slug
+    counter = 2
+    while True:
+        result = await db.execute(select(Workspace.id).where(Workspace.slug == slug))
+        if result.scalar_one_or_none() is None:
+            return slug
+        slug = f"{base_slug}-{counter}"
+        counter += 1
 
 
 @router.post("/login", response_model=Token)
@@ -76,28 +96,43 @@ async def register(
             detail="Email already registered"
         )
 
-    user = await user_service.create_user(db, user_in)
+    try:
+        user = await user_service.create_user(db, user_in, auto_commit=False)
+        await db.flush()  # Ensure user.id is available before creating membership
 
-    # Auto-create default workspace for new user
-    ws_name = f"{user.full_name or user.email.split('@')[0]}'s Workspace"
-    ws_slug = re.sub(r'[^\w\s-]', '', ws_name.lower().strip())
-    ws_slug = re.sub(r'[\s_]+', '-', ws_slug)
-    ws_slug = re.sub(r'-+', '-', ws_slug).strip('-')
+        # Auto-create default workspace for new user
+        ws_name = f"{user.full_name or user.email.split('@')[0]}'s Workspace"
+        base_slug = _generate_workspace_slug(ws_name)
+        unique_slug = await _ensure_unique_workspace_slug(db, base_slug)
 
-    workspace = Workspace(name=ws_name, slug=ws_slug)
-    db.add(workspace)
-    await db.flush()  # Get workspace.id
+        workspace = Workspace(name=ws_name, slug=unique_slug)
+        db.add(workspace)
+        await db.flush()  # Get workspace.id
 
-    member = WorkspaceMember(
-        workspace_id=workspace.id,
-        user_id=user.id,
-        role=WorkspaceRole.ADMIN.value,
-    )
-    db.add(member)
-    await db.commit()
-    await db.refresh(user)
-
-    return UserResponse.model_validate(user)
+        member = WorkspaceMember(
+            workspace_id=workspace.id,
+            user_id=user.id,
+            role=WorkspaceRole.ADMIN.value,
+        )
+        db.add(member)
+        await db.commit()
+        await db.refresh(user)
+        return UserResponse.model_validate(user)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Registration conflict detected. Please retry.",
+        )
+    except HTTPException:
+        await db.rollback()
+        raise
+    except Exception:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to complete registration",
+        )
 
 
 @router.get("/me", response_model=UserResponse)

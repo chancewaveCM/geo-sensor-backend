@@ -20,7 +20,12 @@ async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
     return result.scalar_one_or_none()
 
 
-async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
+async def create_user(
+    db: AsyncSession,
+    user_in: UserCreate,
+    *,
+    auto_commit: bool = True,
+) -> User:
     """Create new user."""
     user = User(
         email=user_in.email,
@@ -30,8 +35,9 @@ async def create_user(db: AsyncSession, user_in: UserCreate) -> User:
         is_superuser=False,
     )
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    if auto_commit:
+        await db.commit()
+        await db.refresh(user)
     return user
 
 
