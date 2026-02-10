@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_current_active_user, get_db
 from app.core.config import settings
 from app.models.enums import LLMProvider
 from app.models.user import User
@@ -156,7 +156,7 @@ Return ONLY the JSON object, no markdown formatting."""
 @router.post("/analyze-text", response_model=DiagnosisResult)
 async def analyze_text(
     request: AnalyzeTextRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Analyze text content for citation optimization potential."""
     return await _analyze_content(
@@ -167,7 +167,7 @@ async def analyze_text(
 @router.post("/analyze-url", response_model=DiagnosisResult)
 async def analyze_url(
     request: AnalyzeUrlRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Analyze a URL's content for citation optimization.
 
@@ -208,7 +208,7 @@ async def analyze_url(
 @router.post("/diagnose", response_model=DiagnosisResult)
 async def diagnose_content(
     request: DiagnoseRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Detailed diagnosis of content with findings and recommendations."""
     return await _analyze_content(
@@ -219,7 +219,7 @@ async def diagnose_content(
 @router.post("/suggest", response_model=SuggestResult)
 async def suggest_improvements(
     request: SuggestRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Generate optimization suggestions for content."""
     _validate_provider(request.llm_provider)
@@ -289,7 +289,7 @@ Return ONLY the JSON object, no markdown formatting."""
 @router.post("/compare", response_model=CompareResult)
 async def compare_content(
     request: CompareRequest,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Compare original vs optimized content scores."""
     _validate_provider(request.llm_provider)
@@ -362,7 +362,7 @@ Return ONLY the JSON object, no markdown formatting."""
 @router.get("/history", response_model=AnalysisHistoryResponse)
 async def get_analysis_history(
     db: Annotated[AsyncSession, Depends(get_db)],
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: Annotated[User, Depends(get_current_active_user)],
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
 ):
