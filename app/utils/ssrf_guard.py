@@ -33,6 +33,9 @@ def is_private_ip(ip_str: str) -> bool:
     """Check if an IP address is in a private/reserved range."""
     try:
         ip = ipaddress.ip_address(ip_str)
+        # Unwrap IPv4-mapped IPv6 addresses (e.g., ::ffff:127.0.0.1)
+        if hasattr(ip, "ipv4_mapped") and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
         return any(ip in network for network in BLOCKED_NETWORKS)
     except ValueError:
         return False
@@ -150,8 +153,8 @@ def validate_url(url: str) -> None:
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid URL: {e!s}",
+            detail="Invalid URL format",
         )

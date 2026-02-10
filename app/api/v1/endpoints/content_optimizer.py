@@ -41,14 +41,22 @@ router = APIRouter(prefix="/content-optimizer", tags=["content-optimizer"])
 
 def _get_api_key(provider: str) -> str:
     """Get API key for the given provider string."""
+    key = ""
     if provider == "gemini":
-        return settings.GEMINI_API_KEY
+        key = settings.GEMINI_API_KEY
     elif provider == "openai":
-        return settings.OPENAI_API_KEY
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Invalid provider: {provider}",
-    )
+        key = settings.OPENAI_API_KEY
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid provider: {provider}",
+        )
+    if not key:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"API key for {provider} is not configured",
+        )
+    return key
 
 
 def _validate_provider(provider: str) -> None:
@@ -188,9 +196,10 @@ async def analyze_url(
                 )
             text = resp.text[:50000]  # Limit content size
     except httpx.HTTPError as e:
+        logger.error(f"URL fetch failed for {request.url}: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to fetch URL: {e}",
+            detail="Failed to fetch URL content. Please check the URL and try again.",
         )
 
     return await _analyze_content(text, request.target_brand, request.llm_provider)
