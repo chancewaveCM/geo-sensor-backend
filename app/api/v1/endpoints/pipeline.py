@@ -31,7 +31,7 @@ from app.services.pipeline.query_expander import QueryExpanderService
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
 
-SUNSET_DATE = "2026-06-01T00:00:00Z"
+SUNSET_DATE = "Mon, 01 Jun 2026 00:00:00 GMT"
 SUNSET_LINK = "</api/v1/unified-analysis/start>; rel=\"successor-version\""
 
 

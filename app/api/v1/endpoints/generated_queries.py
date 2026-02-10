@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/generated-queries", tags=["generated-queries"])
 
-SUNSET_DATE = "2026-06-01T00:00:00Z"
+SUNSET_DATE = "Mon, 01 Jun 2026 00:00:00 GMT"
 SUNSET_LINK = "</api/v1/unified-analysis/start>; rel=\"successor-version\""
 
 
@@ -113,8 +113,8 @@ async def generate_queries(
     # Gemini API 호출
     llm = LLMFactory.create(LLMProvider.GEMINI, settings.GEMINI_API_KEY)
     try:
-        response = await llm.generate(prompt, max_tokens=4096)
-        response_text = response.content  # LLMResponse 객체에서 content 추출
+        llm_response = await llm.generate(prompt, max_tokens=4096)
+        response_text = llm_response.content  # LLMResponse 객체에서 content 추출
     except Exception as e:
         logger.error(f"LLM service error: {e}")
         raise HTTPException(
