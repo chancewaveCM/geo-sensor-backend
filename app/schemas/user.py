@@ -1,3 +1,4 @@
+import json
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
@@ -48,4 +49,39 @@ class UserResponse(UserBase):
 
     id: int
     is_active: bool
+    avatar_url: str | None = None
+    notification_preferences: dict | None = None
     created_at: datetime
+
+    @field_validator("notification_preferences", mode="before")
+    @classmethod
+    def parse_notification_preferences(cls, v: str | dict | None) -> dict | None:
+        if v is None:
+            return None
+        if isinstance(v, dict):
+            return v
+        try:
+            return json.loads(v)
+        except (json.JSONDecodeError, TypeError):
+            return None
+
+
+class UserProfileUpdate(BaseModel):
+    full_name: str | None = None
+    avatar_url: str | None = None
+    notification_preferences: str | None = None  # JSON string
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_new_password(cls, v: str) -> str:
+        return validate_password_strength(v)
+
+
+class AvatarUploadRequest(BaseModel):
+    avatar_data: str = Field(..., description="Base64 encoded image data")
+    content_type: str = Field(default="image/png", pattern=r"^image/(png|jpeg|gif|webp)$")
