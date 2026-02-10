@@ -16,6 +16,7 @@ from app.api.v1.endpoints import (
     pipeline,
     projects,
     queries,
+    unified_analysis,
     users,
     workspaces,
 )
@@ -40,6 +41,7 @@ api_router.include_router(gallery.router)
 api_router.include_router(comparisons.router)
 api_router.include_router(operations.router)
 api_router.include_router(dashboard.router)
+api_router.include_router(unified_analysis.router)
 
 
 @api_router.get("/")

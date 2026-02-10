@@ -43,8 +43,8 @@ class RawLLMResponse(Base, TimestampMixin):
     query_id: Mapped[int] = mapped_column(
         sa.ForeignKey("expanded_queries.id"), nullable=False
     )
-    pipeline_job_id: Mapped[int] = mapped_column(
-        sa.ForeignKey("pipeline_jobs.id"), nullable=False
+    pipeline_job_id: Mapped[int | None] = mapped_column(
+        sa.ForeignKey("pipeline_jobs.id"), nullable=True
     )
 
     # Relationships

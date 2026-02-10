@@ -2,7 +2,7 @@
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, DbSession
@@ -21,6 +21,16 @@ from app.services.llm.factory import LLMFactory
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/generated-queries", tags=["generated-queries"])
+
+SUNSET_DATE = "2026-06-01T00:00:00Z"
+SUNSET_LINK = "</api/v1/unified-analysis/start>; rel=\"successor-version\""
+
+
+def _add_sunset_headers(response: Response) -> None:
+    """Add Sunset headers to indicate API deprecation."""
+    response.headers["Sunset"] = SUNSET_DATE
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = SUNSET_LINK
 
 
 def parse_queries_from_response(response_text: str) -> list[dict]:
@@ -60,8 +70,10 @@ async def generate_queries(
     data: GenerateQueriesRequest,
     db: DbSession,
     current_user: CurrentUser,
+    response: Response,
 ) -> list[GeneratedQuery]:
     """Generate 30 queries using Gemini for a company profile."""
+    _add_sunset_headers(response)
     # 회사 프로필 조회
     result = await db.execute(
         select(CompanyProfile).where(
@@ -152,8 +164,10 @@ async def list_generated_queries(
     company_profile_id: int,
     db: DbSession,
     current_user: CurrentUser,
+    response: Response,
 ) -> list[GeneratedQuery]:
     """List generated queries for a company profile."""
+    _add_sunset_headers(response)
     # 권한 확인
     profile_result = await db.execute(
         select(CompanyProfile).where(
@@ -181,8 +195,10 @@ async def update_generated_query(
     data: GeneratedQueryUpdate,
     db: DbSession,
     current_user: CurrentUser,
+    response: Response,
 ) -> GeneratedQuery:
     """Update a generated query (edit text, toggle selection)."""
+    _add_sunset_headers(response)
     result = await db.execute(
         select(GeneratedQuery)
         .join(CompanyProfile)
@@ -207,8 +223,10 @@ async def bulk_update_queries(
     data: BulkUpdateRequest,
     db: DbSession,
     current_user: CurrentUser,
+    response: Response,
 ) -> list[GeneratedQuery]:
     """Bulk update queries (select/exclude multiple)."""
+    _add_sunset_headers(response)
     result = await db.execute(
         select(GeneratedQuery)
         .join(CompanyProfile)

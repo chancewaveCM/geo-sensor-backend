@@ -3,7 +3,7 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
@@ -30,6 +30,16 @@ from app.services.pipeline.query_executor import QueryExecutorService
 from app.services.pipeline.query_expander import QueryExpanderService
 
 router = APIRouter(prefix="/pipeline", tags=["pipeline"])
+
+SUNSET_DATE = "2026-06-01T00:00:00Z"
+SUNSET_LINK = "</api/v1/unified-analysis/start>; rel=\"successor-version\""
+
+
+def _add_sunset_headers(response: Response) -> None:
+    """Add Sunset headers to indicate API deprecation."""
+    response.headers["Sunset"] = SUNSET_DATE
+    response.headers["Deprecation"] = "true"
+    response.headers["Link"] = SUNSET_LINK
 
 
 # ============ Schemas ============
@@ -401,8 +411,10 @@ async def start_pipeline(
     request: StartPipelineRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Start a new pipeline job for query generation."""
+    _add_sunset_headers(response)
     # Validate company profile
     result = await db.execute(
         select(CompanyProfile).where(
@@ -482,8 +494,10 @@ async def get_job_status(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get pipeline job status and progress."""
+    _add_sunset_headers(response)
     result = await db.execute(
         select(PipelineJob).where(
             PipelineJob.id == job_id,
@@ -533,11 +547,13 @@ async def get_job_status(
 async def list_jobs(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
     company_profile_id: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
     """List pipeline jobs, optionally filtered by company profile."""
+    _add_sunset_headers(response)
     query = select(PipelineJob).where(PipelineJob.owner_id == current_user.id)
 
     if company_profile_id:
@@ -597,8 +613,10 @@ async def cancel_job(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Cancel a running pipeline job."""
+    _add_sunset_headers(response)
     result = await db.execute(
         select(PipelineJob).where(
             PipelineJob.id == job_id,
@@ -637,8 +655,10 @@ async def get_categories(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get generated categories for a pipeline job."""
+    _add_sunset_headers(response)
     # FIX #2: Get job first to access its query_set_id
     job_result = await db.execute(
         select(PipelineJob).where(
@@ -685,9 +705,11 @@ async def get_queries(
     job_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
     category_id: int | None = None,
 ):
     """Get expanded queries for a pipeline job."""
+    _add_sunset_headers(response)
     # FIX #3: Get job first to access its query_set_id
     job_result = await db.execute(
         select(PipelineJob).where(
@@ -742,8 +764,10 @@ async def get_responses(
     query_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get raw LLM responses for a query."""
+    _add_sunset_headers(response)
     # FIX #4: Verify ownership through the correct path
     # ExpandedQuery -> Category -> QuerySet -> owner_id
     # ExpandedQuery has NO direct relationship to PipelineJob
@@ -794,8 +818,10 @@ async def rerun_query_set(
     request: RerunQuerySetRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Re-run an existing QuerySet to create new time-series data point."""
+    _add_sunset_headers(response)
     # Verify ownership
     qs_result = await db.execute(
         select(QuerySet).where(
@@ -875,8 +901,10 @@ async def get_query_set_history(
     query_set_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get execution history for a QuerySet (for time-series analysis)."""
+    _add_sunset_headers(response)
     # Verify ownership
     qs_result = await db.execute(
         select(QuerySet).where(
@@ -921,11 +949,13 @@ async def get_query_set_history(
 async def list_query_sets(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
     company_profile_id: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
     """List all QuerySets owned by user."""
+    _add_sunset_headers(response)
     # Subquery for last job status
     last_job_status_subq = (
         select(PipelineJob.status)
@@ -1016,8 +1046,10 @@ async def get_query_set_detail(
     query_set_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get detailed information about a QuerySet including categories and job history."""
+    _add_sunset_headers(response)
     # Verify ownership and load with relationships
     result = await db.execute(
         select(QuerySet)
@@ -1096,8 +1128,10 @@ async def update_category(
     request: UpdateCategoryRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Partially update a category."""
+    _add_sunset_headers(response)
     # Load category with query_set for auth
     result = await db.execute(
         select(PipelineCategory)
@@ -1137,8 +1171,10 @@ async def delete_category(
     category_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Delete a category (cascade deletes expanded queries)."""
+    _add_sunset_headers(response)
     # Load category with query_set for auth
     result = await db.execute(
         select(PipelineCategory)
@@ -1165,8 +1201,10 @@ async def create_category(
     request: CreateCategoryRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Create a new category for a query set."""
+    _add_sunset_headers(response)
     # Verify ownership
     qs_result = await db.execute(
         select(QuerySet).where(
@@ -1232,8 +1270,10 @@ async def get_category_queries(
     category_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get expanded queries for a category."""
+    _add_sunset_headers(response)
     # Load category with query_set for auth
     result = await db.execute(
         select(PipelineCategory)
@@ -1276,8 +1316,11 @@ async def get_category_queries(
 async def get_profile_pipeline_stats(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Get pipeline health statistics for each company profile.
+
+    _add_sunset_headers(response)
 
     Optimized from 8 queries to 3:
     1. Profiles + QuerySet counts (LEFT JOIN + GROUP BY)
@@ -1511,8 +1554,10 @@ async def create_schedule(
     request: CreateScheduleRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Create a pipeline schedule for a QuerySet."""
+    _add_sunset_headers(response)
     # Verify QuerySet ownership
     qs_result = await db.execute(
         select(QuerySet)
@@ -1586,12 +1631,14 @@ async def create_schedule(
 async def list_schedules(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
     query_set_id: int | None = None,
     company_profile_id: int | None = None,
     limit: int = 20,
     offset: int = 0,
 ):
     """List all pipeline schedules for the current user."""
+    _add_sunset_headers(response)
     query = select(ScheduleConfig).where(ScheduleConfig.owner_id == current_user.id)
     count_query = select(func.count(ScheduleConfig.id)).where(
         ScheduleConfig.owner_id == current_user.id
@@ -1657,8 +1704,10 @@ async def update_schedule(
     request: UpdateScheduleRequest,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Update a pipeline schedule."""
+    _add_sunset_headers(response)
     result = await db.execute(
         select(ScheduleConfig)
         .where(
@@ -1717,8 +1766,10 @@ async def delete_schedule(
     schedule_id: int,
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
+    response: Response,
 ):
     """Delete a pipeline schedule."""
+    _add_sunset_headers(response)
     result = await db.execute(
         select(ScheduleConfig).where(
             ScheduleConfig.id == schedule_id,
