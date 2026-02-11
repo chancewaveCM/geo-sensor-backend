@@ -127,7 +127,7 @@ def _parse_variants(text: str, num_variants: int) -> list[str]:
     return variants[:num_variants]
 
 
-def _generate_diff_summary(original: str, rewritten: str) -> str:
+def generate_diff_summary(original: str, rewritten: str) -> str:
     """Generate a simple word-level diff summary."""
     orig_words = set(original.lower().split())
     new_words = set(rewritten.lower().split())

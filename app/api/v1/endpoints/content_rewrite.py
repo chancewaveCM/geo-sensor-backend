@@ -1,9 +1,8 @@
 """Content Rewrite API endpoints."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import APIRouter, HTTPException, Query
 
-from app.api.deps import WorkspaceMemberDep, get_async_session
+from app.api.deps import DbSession, WorkspaceMemberDep
 from app.schemas.content_rewrite import (
     RewriteListResponse,
     RewriteRequest,
@@ -11,7 +10,7 @@ from app.schemas.content_rewrite import (
     RewriteVariantResponse,
     VariantApprovalRequest,
 )
-from app.services.content.rewriter import ContentRewriter, _generate_diff_summary
+from app.services.content.rewriter import ContentRewriter, generate_diff_summary
 
 router = APIRouter(tags=["content-rewrite"])
 
@@ -24,7 +23,7 @@ async def generate_rewrite(
     workspace_id: int,
     request: RewriteRequest,
     member: WorkspaceMemberDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: DbSession,
 ) -> RewriteResponse:
     """Generate AI-powered content rewrite variants."""
     try:
@@ -49,7 +48,7 @@ async def generate_rewrite(
                 variant_number=v.variant_number,
                 content=v.content,
                 status=v.status,
-                diff_summary=_generate_diff_summary(rewrite.original_content, v.content),
+                diff_summary=generate_diff_summary(rewrite.original_content, v.content),
             )
             for v in rewrite.variants
         ],
@@ -64,7 +63,7 @@ async def generate_rewrite(
 async def list_rewrites(
     workspace_id: int,
     member: WorkspaceMemberDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: DbSession,
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ) -> RewriteListResponse:
@@ -81,7 +80,7 @@ async def list_rewrites(
                         variant_number=v.variant_number,
                         content=v.content,
                         status=v.status,
-                        diff_summary=_generate_diff_summary(r.original_content, v.content),
+                        diff_summary=generate_diff_summary(r.original_content, v.content),
                     )
                     for v in r.variants
                 ],
@@ -101,7 +100,7 @@ async def get_rewrite(
     workspace_id: int,
     rewrite_id: int,
     member: WorkspaceMemberDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: DbSession,
 ) -> RewriteResponse:
     """Get a specific content rewrite with variants."""
     rewrite = await ContentRewriter.get_rewrite(rewrite_id, db)
@@ -117,7 +116,7 @@ async def get_rewrite(
                 variant_number=v.variant_number,
                 content=v.content,
                 status=v.status,
-                diff_summary=_generate_diff_summary(rewrite.original_content, v.content),
+                diff_summary=generate_diff_summary(rewrite.original_content, v.content),
             )
             for v in rewrite.variants
         ],
@@ -135,7 +134,7 @@ async def update_variant_status(
     variant_id: int,
     request: VariantApprovalRequest,
     member: WorkspaceMemberDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: DbSession,
 ) -> RewriteVariantResponse:
     """Approve or reject a rewrite variant."""
     rewrite = await ContentRewriter.get_rewrite(rewrite_id, db)
@@ -152,5 +151,5 @@ async def update_variant_status(
         variant_number=variant.variant_number,
         content=variant.content,
         status=variant.status,
-        diff_summary=_generate_diff_summary(rewrite.original_content, variant.content),
+        diff_summary=generate_diff_summary(rewrite.original_content, variant.content),
     )
