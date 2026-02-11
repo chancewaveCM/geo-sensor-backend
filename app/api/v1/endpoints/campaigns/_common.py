@@ -1,9 +1,9 @@
 """Shared dependencies and helpers for campaign endpoints."""
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 
 from app.api.deps import DbSession
+from app.core.exceptions import NotFoundError
 from app.models.campaign import Campaign
 
 
@@ -21,8 +21,5 @@ async def _get_campaign_or_404(
     )
     campaign = result.scalar_one_or_none()
     if campaign is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Campaign not found",
-        )
+        raise NotFoundError("Campaign", campaign_id)
     return campaign

@@ -13,6 +13,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.core.error_handlers import problem_detail_handler
+from app.core.exceptions import ProblemDetail
 from app.core.logging import get_logger, set_correlation_id
 from app.db.session import async_session_maker
 from app.models.enums import PipelineStatus
@@ -123,6 +125,7 @@ app = FastAPI(
 
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_exception_handler(ProblemDetail, problem_detail_handler)
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(

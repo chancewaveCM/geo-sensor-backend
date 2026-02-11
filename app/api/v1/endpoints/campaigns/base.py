@@ -2,7 +2,7 @@
 
 import json
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, status
 from sqlalchemy import func, select
 
 from app.api.deps import (
@@ -12,6 +12,7 @@ from app.api.deps import (
     WorkspaceAdminDep,
     WorkspaceMemberDep,
 )
+from app.core.exceptions import ConflictError, InternalError, NotFoundError, ValidationError
 from app.models.campaign import (
     Campaign,
     CampaignCompany,
@@ -68,10 +69,7 @@ async def create_campaign(
 
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create campaign: {e!s}",
-        )
+        raise InternalError(f"Failed to create campaign: {e!s}")
 
 
 @router.get("/", response_model=list[CampaignResponse])
@@ -156,10 +154,7 @@ async def update_campaign(
 
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update campaign: {e!s}",
-        )
+        raise InternalError(f"Failed to update campaign: {e!s}")
 
 
 @router.delete("/{campaign_id}", status_code=status.HTTP_200_OK)
@@ -178,10 +173,7 @@ async def delete_campaign(
         return {"message": "Campaign archived"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to archive campaign: {e!s}",
-        )
+        raise InternalError(f"Failed to archive campaign: {e!s}")
 
 
 # ---------------------------------------------------------------------------
@@ -205,10 +197,7 @@ async def create_campaign_run(
     campaign = await _get_campaign_or_404(db, workspace_id, campaign_id)
 
     if campaign.status != CampaignStatus.ACTIVE.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cannot run a campaign that is not active",
-        )
+        raise ValidationError("Cannot run a campaign that is not active")
 
     try:
         # Determine next run_number
@@ -244,14 +233,11 @@ async def create_campaign_run(
         await db.refresh(campaign_run)
         return CampaignRunResponse.model_validate(campaign_run)
 
-    except HTTPException:
+    except (NotFoundError, ValidationError):
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create campaign run: {e!s}",
-        )
+        raise InternalError(f"Failed to create campaign run: {e!s}")
 
 
 @router.get("/{campaign_id}/runs", response_model=list[CampaignRunResponse])
@@ -298,10 +284,7 @@ async def get_campaign_run(
     )
     run = result.scalar_one_or_none()
     if run is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Campaign run not found",
-        )
+        raise NotFoundError("Campaign run", run_id)
     return CampaignRunResponse.model_validate(run)
 
 
@@ -334,10 +317,7 @@ async def link_campaign_company(
     )
     company = cp_result.scalar_one_or_none()
     if company is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Company profile not found",
-        )
+        raise NotFoundError("Company profile", company_in.company_profile_id)
 
     # Check for duplicate link
     dup_result = await db.execute(
@@ -347,10 +327,7 @@ async def link_campaign_company(
         )
     )
     if dup_result.scalar_one_or_none() is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Company is already linked to this campaign",
-        )
+        raise ConflictError("Company is already linked to this campaign")
 
     try:
         # Determine display_order
@@ -377,14 +354,11 @@ async def link_campaign_company(
         response.company_name = company.name
         return response
 
-    except HTTPException:
+    except (NotFoundError, ConflictError):
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to link company: {e!s}",
-        )
+        raise InternalError(f"Failed to link company: {e!s}")
 
 
 @router.get(
@@ -447,10 +421,7 @@ async def update_campaign_company(
     )
     link = result.scalar_one_or_none()
     if link is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Campaign-company link not found",
-        )
+        raise NotFoundError("Campaign-company link", link_id)
 
     try:
         update_data = company_update.model_dump(exclude_unset=True)
@@ -472,14 +443,11 @@ async def update_campaign_company(
         response.company_name = cp.name if cp else None
         return response
 
-    except HTTPException:
+    except NotFoundError:
         raise
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update campaign company: {e!s}",
-        )
+        raise InternalError(f"Failed to update campaign company: {e!s}")
 
 
 @router.delete(
@@ -504,10 +472,7 @@ async def unlink_campaign_company(
     )
     link = result.scalar_one_or_none()
     if link is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Campaign-company link not found",
-        )
+        raise NotFoundError("Campaign-company link", link_id)
 
     try:
         await db.delete(link)
@@ -515,7 +480,4 @@ async def unlink_campaign_company(
         return {"message": "Company unlinked from campaign"}
     except Exception as e:
         await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unlink company: {e!s}",
-        )
+        raise InternalError(f"Failed to unlink company: {e!s}")
