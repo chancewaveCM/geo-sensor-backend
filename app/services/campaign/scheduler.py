@@ -15,8 +15,24 @@ from app.models.enums import CampaignStatus, RunStatus, TriggerType
 logger = logging.getLogger(__name__)
 
 
+# Schedule interval mapping (in hours)
+SCHEDULE_INTERVALS = {
+    "hourly": 1,
+    "every_6h": 6,
+    "daily": 24,
+    "weekly": 168,  # 24 * 7
+    "monthly": 720,  # 24 * 30 (approximate)
+}
+
+
 class CampaignScheduler:
     """Polls the database for campaigns due for scheduled execution.
+
+    Supports:
+    - Custom schedule intervals (hourly, every_6h, daily, weekly, monthly)
+    - Cron expressions for advanced scheduling
+    - Missed-run detection on startup
+    - Health status endpoint
 
     Usage:
         scheduler = CampaignScheduler(poll_interval_seconds=60)
@@ -29,25 +45,88 @@ class CampaignScheduler:
         self.poll_interval = poll_interval_seconds
         self._running = False
         self._task: asyncio.Task | None = None
+        self._start_time: datetime | None = None
+        self._last_poll_time: datetime | None = None
+        self._total_polls = 0
+        self._total_runs_created = 0
+        self._errors = 0
 
     async def start(self) -> None:
         """Start the scheduler polling loop."""
         self._running = True
+        self._start_time = datetime.now(tz=UTC)
         logger.info(
             "Campaign scheduler started (poll interval: %ds)",
             self.poll_interval,
         )
+
+        # Check for missed runs on startup
+        await self._detect_missed_runs()
+
         while self._running:
             try:
                 await self._poll_and_execute()
+                self._total_polls += 1
+                self._last_poll_time = datetime.now(tz=UTC)
             except Exception:
                 logger.exception("Error in scheduler poll cycle")
+                self._errors += 1
             await asyncio.sleep(self.poll_interval)
 
     def stop(self) -> None:
         """Stop the scheduler gracefully."""
         self._running = False
         logger.info("Campaign scheduler stopping...")
+
+    def get_health_status(self) -> dict:
+        """Return health status of the scheduler."""
+        now = datetime.now(tz=UTC)
+        uptime_seconds = (now - self._start_time).total_seconds() if self._start_time else 0
+
+        return {
+            "status": "running" if self._running else "stopped",
+            "start_time": self._start_time.isoformat() if self._start_time else None,
+            "last_poll_time": self._last_poll_time.isoformat() if self._last_poll_time else None,
+            "uptime_seconds": int(uptime_seconds),
+            "total_polls": self._total_polls,
+            "total_runs_created": self._total_runs_created,
+            "errors": self._errors,
+            "poll_interval_seconds": self.poll_interval,
+        }
+
+    async def _detect_missed_runs(self) -> None:
+        """Detect and log campaigns that missed their scheduled runs."""
+        async with async_session_maker() as db:
+            try:
+                now = datetime.now(tz=UTC)
+
+                # Find active campaigns with scheduling enabled and overdue runs
+                # 1 hour tolerance for missed runs
+                one_hour_ago = now - timedelta(hours=1)
+                result = await db.execute(
+                    select(Campaign).where(
+                        Campaign.status == CampaignStatus.ACTIVE.value,
+                        Campaign.schedule_enabled.is_(True),
+                        Campaign.schedule_next_run_at.isnot(None),
+                        Campaign.schedule_next_run_at < one_hour_ago,
+                    )
+                )
+                missed_campaigns = result.scalars().all()
+
+                if missed_campaigns:
+                    logger.warning(
+                        "Detected %d campaigns with missed scheduled runs",
+                        len(missed_campaigns)
+                    )
+                    for campaign in missed_campaigns:
+                        logger.warning(
+                            "Campaign %d (%s) missed run at %s",
+                            campaign.id,
+                            campaign.name,
+                            campaign.schedule_next_run_at,
+                        )
+            except Exception:
+                logger.exception("Error during missed-run detection")
 
     async def _poll_and_execute(self) -> None:
         """Check for campaigns due for execution and create runs."""
@@ -144,6 +223,7 @@ class CampaignScheduler:
         )
 
         await db.commit()
+        self._total_runs_created += 1
         logger.info(
             "Created scheduled run #%d for campaign %d (%s), next run at %s",
             next_run_number,

@@ -114,3 +114,29 @@ class ComparisonType(str, enum.Enum):
     LLM_VS_LLM = "llm_vs_llm"
     DATE_VS_DATE = "date_vs_date"
     VERSION_VS_VERSION = "version_vs_version"
+
+
+class NotificationType(str, enum.Enum):
+    """Notification delivery types."""
+    EMAIL = "email"
+    WEBHOOK = "webhook"
+
+
+class NotificationStatus(str, enum.Enum):
+    """Notification delivery status."""
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+
+
+class ThresholdType(str, enum.Enum):
+    """Alert threshold types."""
+    ABSOLUTE = "absolute"
+    PERCENTAGE = "percentage"
+
+
+class ComparisonOperator(str, enum.Enum):
+    """Alert comparison operators."""
+    ABOVE = "above"
+    BELOW = "below"
+    CHANGE = "change"

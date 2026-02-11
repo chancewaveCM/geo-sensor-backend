@@ -16,11 +16,14 @@ from app.models.company_profile import CompanyProfile
 from app.models.dead_letter import DeadLetterJob
 from app.models.enums import (
     CampaignStatus,
+    ComparisonOperator,
     ComparisonType,
     ExpandedQueryStatus,
     LabelSeverity,
     LabelType,
     LLMProvider,
+    NotificationStatus,
+    NotificationType,
     OperationStatus,
     OperationType,
     PersonaType,
@@ -28,6 +31,7 @@ from app.models.enums import (
     QueryType,
     ReviewType,
     RunStatus,
+    ThresholdType,
     TriggerType,
     WorkspaceRole,
 )
@@ -44,6 +48,7 @@ from app.models.generated_query import (
     QueryCategory,
 )
 from app.models.insight import Insight
+from app.models.notification import NotificationConfig, NotificationLog
 from app.models.pipeline_category import PipelineCategory
 from app.models.pipeline_job import PipelineJob
 from app.models.project import Project
@@ -119,4 +124,12 @@ __all__ = [
     "Insight",
     # Annotation
     "CampaignAnnotation",
+    # Notification models
+    "NotificationConfig",
+    "NotificationLog",
+    # Notification enums
+    "NotificationType",
+    "NotificationStatus",
+    "ThresholdType",
+    "ComparisonOperator",
 ]

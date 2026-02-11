@@ -13,6 +13,7 @@ from app.api.v1.endpoints import (
     gallery,
     generated_queries,
     llm,
+    notifications,
     operations,
     pipeline,
     projects,
@@ -44,6 +45,7 @@ api_router.include_router(operations.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(unified_analysis.router)
 api_router.include_router(content_optimizer.router)
+api_router.include_router(notifications.router)
 
 
 @api_router.get("/")
