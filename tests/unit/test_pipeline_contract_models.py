@@ -5,8 +5,12 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from app.api.v1.endpoints import pipeline
 from app.main import app
+from app.schemas.pipeline import (
+    CompanyProfilePipelineStats,
+    QuerySetDetailResponse,
+    ScheduleConfigResponse,
+)
 
 
 def test_company_profile_pipeline_stats_contract_fields():
@@ -25,7 +29,7 @@ def test_company_profile_pipeline_stats_contract_fields():
         "health_grade": "green",
     }
 
-    model = pipeline.CompanyProfilePipelineStats.model_validate(payload)
+    model = CompanyProfilePipelineStats.model_validate(payload)
     assert model.total_query_sets == 3
     assert model.success_rate_30d == 90.0
     assert model.health_grade == "green"
@@ -55,7 +59,7 @@ def test_queryset_detail_contract_requires_total_jobs_and_detail_last_job_shape(
         "total_responses": 120,
     }
 
-    model = pipeline.QuerySetDetailResponse.model_validate(payload)
+    model = QuerySetDetailResponse.model_validate(payload)
     assert model.total_jobs == 7
     assert model.last_job is not None
     assert model.last_job.total_queries == 40
@@ -75,14 +79,14 @@ def test_schedule_config_contract_requires_company_fields():
         "llm_providers": ["gemini", "openai"],
         "created_at": datetime.now(tz=UTC),
     }
-    model = pipeline.ScheduleConfigResponse.model_validate(payload)
+    model = ScheduleConfigResponse.model_validate(payload)
     assert model.company_profile_id == 99
     assert model.company_name == "ACME"
 
     invalid = payload.copy()
     invalid.pop("company_name")
     with pytest.raises(ValidationError):
-        pipeline.ScheduleConfigResponse.model_validate(invalid)
+        ScheduleConfigResponse.model_validate(invalid)
 
 
 def test_list_schedules_exposes_expected_query_filters():
