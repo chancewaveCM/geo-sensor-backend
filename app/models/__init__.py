@@ -13,6 +13,7 @@ from app.models.campaign import (
 )
 from app.models.citation import Citation, MatchType
 from app.models.company_profile import CompanyProfile
+from app.models.dead_letter import DeadLetterJob
 from app.models.enums import (
     CampaignStatus,
     ComparisonType,
@@ -78,6 +79,7 @@ __all__ = [
     "ExpandedQuery",
     "RawLLMResponse",
     "ScheduleConfig",
+    "DeadLetterJob",
     # Pipeline enums
     "PersonaType",
     "PipelineStatus",

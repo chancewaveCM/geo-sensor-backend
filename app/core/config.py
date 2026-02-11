@@ -76,6 +76,10 @@ class Settings(BaseSettings):
     PIPELINE_LLM_TIMEOUT_SECONDS: int = 60
     PIPELINE_SCHEDULER_INTERVAL_SECONDS: int = 300
 
+    # Redis/ARQ configuration
+    REDIS_URL: str = "redis://localhost:6379"
+    USE_ARQ: bool = False  # Feature flag: False = in-memory, True = Redis/ARQ
+
 
 @lru_cache
 def get_settings() -> Settings:
