@@ -37,10 +37,11 @@ class WebhookSender:
 
         try:
             ip = ipaddress.ip_address(hostname)
-            if ip.is_private or ip.is_loopback or ip.is_link_local:
-                raise ValueError("Webhook URL cannot target private IP ranges")
         except ValueError:
             pass  # hostname is a domain name, OK
+        else:
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                raise ValueError("Webhook URL cannot target private IP ranges")
 
     def _generate_signature(self, payload: str) -> str:
         """Generate HMAC-SHA256 signature for payload."""

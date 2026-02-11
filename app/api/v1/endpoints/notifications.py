@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import WorkspaceAdminDep, WorkspaceMemberDep
-from app.db.session import get_async_session
+from app.db.session import get_db
 from app.models.campaign import Campaign
 from app.models.enums import NotificationStatus, NotificationType
 from app.models.notification import NotificationConfig, NotificationLog
@@ -40,7 +40,7 @@ async def create_notification_config(
     campaign_id: int,
     data: NotificationConfigCreate,
     admin: WorkspaceAdminDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Create a notification configuration for a campaign (admin only)."""
     # Verify campaign exists and belongs to workspace
@@ -99,7 +99,7 @@ async def list_notification_configs(
     workspace_id: int,
     campaign_id: int,
     member: WorkspaceMemberDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """List all notification configurations for a campaign."""
     # Verify campaign exists and belongs to workspace
@@ -137,7 +137,7 @@ async def update_notification_config(
     notification_id: int,
     data: NotificationConfigUpdate,
     admin: WorkspaceAdminDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Update a notification configuration (admin only)."""
     # Get notification config
@@ -188,7 +188,7 @@ async def delete_notification_config(
     workspace_id: int,
     notification_id: int,
     admin: WorkspaceAdminDep,
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Delete a notification configuration (admin only)."""
     # Get notification config
@@ -224,7 +224,7 @@ async def get_notification_logs(
     campaign_id: int,
     member: WorkspaceMemberDep,
     limit: int = Query(default=50, ge=1, le=500),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Get notification logs for a campaign."""
     # Verify campaign exists and belongs to workspace
@@ -267,7 +267,7 @@ async def test_notification(
     admin: WorkspaceAdminDep,
     notification_id: int = Query(..., description="Notification config ID to test"),
     test_request: NotificationTestRequest = NotificationTestRequest(),
-    db: AsyncSession = Depends(get_async_session),
+    db: AsyncSession = Depends(get_db),
 ):
     """Test a notification configuration (admin only)."""
     # Get notification config

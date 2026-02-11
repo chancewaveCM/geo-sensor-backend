@@ -103,6 +103,7 @@ class TestWorkspaceSecurity:
         """Expired tokens should be rejected"""
         # Create a token with negative expiration (already expired)
         from datetime import timedelta
+
         from app.core.security import create_access_token as create_token
 
         expired_token = create_token(subject="test-user", expires_delta=timedelta(seconds=-1))
