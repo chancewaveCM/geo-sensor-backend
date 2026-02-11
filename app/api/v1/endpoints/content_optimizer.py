@@ -14,7 +14,7 @@ import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_active_user, get_db
+from app.api.deps import DbSession, get_current_active_user
 from app.core.config import settings
 from app.models.enums import LLMProvider
 from app.models.user import User
@@ -376,7 +376,7 @@ Return ONLY the JSON object, no markdown formatting."""
 
 @router.get("/history", response_model=AnalysisHistoryResponse)
 async def get_analysis_history(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
     limit: int = Query(default=20, ge=1, le=100),
     offset: int = Query(default=0, ge=0),

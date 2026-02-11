@@ -4,13 +4,11 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field
 from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import DbSession, get_current_user
 from app.core.config import settings
 from app.db.session import async_session_maker
 from app.models.company_profile import CompanyProfile
@@ -22,6 +20,36 @@ from app.models.query_set import QuerySet
 from app.models.raw_llm_response import RawLLMResponse
 from app.models.schedule_config import ScheduleConfig
 from app.models.user import User
+from app.schemas.pipeline import (
+    CancelJobResponse,
+    CategoriesListResponse,
+    CategoryResponse,
+    CompanyProfilePipelineStats,
+    CreateCategoryRequest,
+    CreateScheduleRequest,
+    ExpandedQueryResponse,
+    PipelineJobListResponse,
+    PipelineJobStatusResponse,
+    PipelineJobSummary,
+    ProfileStatsListResponse,
+    QueriesListResponse,
+    QuerySetDetailCategoryItem,
+    QuerySetDetailJobItem,
+    QuerySetDetailResponse,
+    QuerySetHistoryItem,
+    QuerySetHistoryResponse,
+    QuerySetListResponse,
+    QuerySetResponse,
+    RawResponseResponse,
+    RerunQuerySetRequest,
+    ResponsesListResponse,
+    ScheduleConfigResponse,
+    ScheduleListResponse,
+    StartPipelineRequest,
+    StartPipelineResponse,
+    UpdateCategoryRequest,
+    UpdateScheduleRequest,
+)
 from app.services.llm.factory import LLMFactory
 from app.services.pipeline.background_manager import BackgroundJobManager
 from app.services.pipeline.category_generator import CategoryGeneratorService
@@ -40,297 +68,6 @@ def _add_sunset_headers(response: Response) -> None:
     response.headers["Sunset"] = SUNSET_DATE
     response.headers["Deprecation"] = "true"
     response.headers["Link"] = SUNSET_LINK
-
-
-# ============ Schemas ============
-
-class StartPipelineRequest(BaseModel):
-    company_profile_id: int
-    category_count: int = Field(default=10, ge=1, le=20)
-    queries_per_category: int = Field(default=10, ge=1, le=20)
-    llm_providers: list[str] = Field(
-        default=["gemini", "openai"],
-        min_length=1,
-        max_length=2,
-    )
-
-
-class StartPipelineResponse(BaseModel):
-    job_id: int
-    status: str
-    message: str
-    estimated_queries: int
-
-
-class PipelineJobStatusResponse(BaseModel):
-    id: int
-    status: str
-    company_profile_id: int
-    query_set_id: int  # FIX #6: Reference QuerySet instead of storing config directly
-    llm_providers: list[str]
-    total_queries: int
-    completed_queries: int
-    failed_queries: int
-    progress_percentage: float
-    started_at: datetime | None
-    completed_at: datetime | None
-    elapsed_seconds: float | None
-    error_message: str | None
-
-    class Config:
-        from_attributes = True
-
-
-# FIX #5: Add missing QuerySet-related response schemas
-class QuerySetResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    category_count: int
-    queries_per_category: int
-    company_profile_id: int
-    created_at: datetime
-    job_count: int  # Number of PipelineJobs that used this QuerySet
-    last_job_status: str | None = None
-    last_run_at: datetime | None = None
-    total_responses: int = 0
-
-    class Config:
-        from_attributes = True
-
-
-class QuerySetListResponse(BaseModel):
-    query_sets: list[QuerySetResponse]
-    total: int
-
-
-class QuerySetHistoryItem(BaseModel):
-    job_id: int
-    status: str
-    completed_queries: int
-    failed_queries: int
-    started_at: datetime | None
-    completed_at: datetime | None
-
-    class Config:
-        from_attributes = True
-
-
-class QuerySetHistoryResponse(BaseModel):
-    query_set_id: int
-    query_set_name: str
-    executions: list[QuerySetHistoryItem]
-    total_executions: int
-
-
-class PipelineJobSummary(BaseModel):
-    id: int
-    status: str
-    company_profile_id: int
-    company_name: str | None = None
-    query_set_id: int | None = None
-    query_set_name: str | None = None
-    llm_providers: list[str]
-    total_queries: int
-    completed_queries: int
-    failed_queries: int
-    progress_percentage: float
-    started_at: datetime | None
-    completed_at: datetime | None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class PipelineJobListResponse(BaseModel):
-    jobs: list[PipelineJobSummary]
-    total: int
-
-
-class CancelJobResponse(BaseModel):
-    job_id: int
-    status: str
-    message: str
-
-
-class CategoryResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    llm_provider: str
-    persona_type: str
-    order_index: int
-    query_count: int
-
-    class Config:
-        from_attributes = True
-
-
-class CategoriesListResponse(BaseModel):
-    categories: list[CategoryResponse]
-
-
-class ExpandedQueryResponse(BaseModel):
-    id: int
-    text: str
-    order_index: int
-    status: str
-    category_id: int
-    response_count: int
-
-    class Config:
-        from_attributes = True
-
-
-class QueriesListResponse(BaseModel):
-    queries: list[ExpandedQueryResponse]
-    total: int
-
-
-class RawResponseResponse(BaseModel):
-    id: int
-    content: str
-    llm_provider: str
-    llm_model: str
-    tokens_used: int | None
-    latency_ms: float | None
-    error_message: str | None
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class ResponsesListResponse(BaseModel):
-    responses: list[RawResponseResponse]
-
-
-class CompanyProfilePipelineStats(BaseModel):
-    company_profile_id: int
-    company_name: str
-    total_query_sets: int
-    total_jobs: int
-    completed_jobs: int
-    failed_jobs: int
-    success_rate_30d: float  # percentage 0-100
-    last_run_status: str | None  # most recent job status
-    last_run_at: datetime | None  # most recent job started_at
-    avg_processing_time_seconds: float | None  # avg of completed jobs
-    data_freshness_hours: float | None  # hours since last successful completion
-    health_grade: str  # "green", "yellow", "red"
-
-    class Config:
-        from_attributes = True
-
-
-class ProfileStatsListResponse(BaseModel):
-    profiles: list[CompanyProfilePipelineStats]
-    total: int
-
-
-class RerunQuerySetRequest(BaseModel):
-    llm_providers: list[str] = Field(
-        default=["gemini", "openai"],
-        min_length=1,
-        max_length=2,
-    )
-
-
-class UpdateCategoryRequest(BaseModel):
-    name: str | None = Field(default=None, min_length=1, max_length=255)
-    description: str | None = Field(default=None, max_length=2000)
-
-
-class CreateCategoryRequest(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    description: str | None = None
-    persona_type: str = Field(default="consumer")
-    llm_provider: str = Field(default="gemini")
-    order_index: int = Field(default=0, ge=0)
-
-
-class QuerySetDetailCategoryItem(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    llm_provider: str
-    persona_type: str
-    order_index: int
-    query_count: int
-
-    class Config:
-        from_attributes = True
-
-
-class QuerySetDetailJobItem(BaseModel):
-    id: int
-    status: str
-    llm_providers: list[str]
-    total_queries: int
-    completed_queries: int
-    failed_queries: int
-    started_at: datetime | None
-    completed_at: datetime | None
-
-    class Config:
-        from_attributes = True
-
-
-class QuerySetDetailResponse(BaseModel):
-    id: int
-    name: str
-    description: str | None
-    category_count: int
-    queries_per_category: int
-    company_profile_id: int
-    created_at: datetime
-    categories: list[QuerySetDetailCategoryItem]
-    last_job: QuerySetDetailJobItem | None
-    total_jobs: int
-    total_responses: int
-
-    class Config:
-        from_attributes = True
-
-
-class CreateScheduleRequest(BaseModel):
-    query_set_id: int
-    interval_minutes: int = Field(..., ge=60, le=43200, description="60 min to 30 days")
-    llm_providers: list[str] = Field(
-        default=["gemini", "openai"],
-        min_length=1,
-        max_length=2,
-    )
-    is_active: bool = True
-
-
-class UpdateScheduleRequest(BaseModel):
-    interval_minutes: int | None = Field(default=None, ge=60, le=43200)
-    llm_providers: list[str] | None = Field(default=None, min_length=1, max_length=2)
-    is_active: bool | None = None
-
-
-class ScheduleConfigResponse(BaseModel):
-    id: int
-    query_set_id: int
-    query_set_name: str
-    company_profile_id: int
-    company_name: str
-    interval_minutes: int
-    is_active: bool
-    last_run_at: datetime | None
-    next_run_at: datetime | None
-    llm_providers: list[str]
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class ScheduleListResponse(BaseModel):
-    schedules: list[ScheduleConfigResponse]
-    total: int
 
 
 # ============ Helpers ============
@@ -371,7 +108,7 @@ def _validate_llm_providers(providers: list[str]) -> None:
 
 def _build_pipeline_services(
     llm_providers: list[str],
-) -> tuple[PipelineOrchestratorService, AsyncSession]:
+) -> tuple[PipelineOrchestratorService, DbSession]:
     """Build pipeline orchestrator with all required services.
 
     Returns (orchestrator, bg_db) - caller must close bg_db on error.
@@ -409,7 +146,7 @@ def _build_pipeline_services(
 @router.post("/start", response_model=StartPipelineResponse)
 async def start_pipeline(
     request: StartPipelineRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -492,7 +229,7 @@ async def start_pipeline(
 @router.get("/jobs/{job_id}", response_model=PipelineJobStatusResponse)
 async def get_job_status(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -545,7 +282,7 @@ async def get_job_status(
 
 @router.get("/jobs", response_model=PipelineJobListResponse)
 async def list_jobs(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
     company_profile_id: int | None = None,
@@ -611,7 +348,7 @@ async def list_jobs(
 @router.post("/jobs/{job_id}/cancel", response_model=CancelJobResponse)
 async def cancel_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -653,7 +390,7 @@ async def cancel_job(
 @router.get("/jobs/{job_id}/categories", response_model=CategoriesListResponse)
 async def get_categories(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -703,7 +440,7 @@ async def get_categories(
 @router.get("/jobs/{job_id}/queries", response_model=QueriesListResponse)
 async def get_queries(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
     category_id: int | None = None,
@@ -762,7 +499,7 @@ async def get_queries(
 @router.get("/queries/{query_id}/responses", response_model=ResponsesListResponse)
 async def get_responses(
     query_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -816,7 +553,7 @@ async def get_responses(
 async def rerun_query_set(
     query_set_id: int,
     request: RerunQuerySetRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -899,7 +636,7 @@ async def rerun_query_set(
 @router.get("/queryset/{query_set_id}/history", response_model=QuerySetHistoryResponse)
 async def get_query_set_history(
     query_set_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -947,7 +684,7 @@ async def get_query_set_history(
 
 @router.get("/queryset", response_model=QuerySetListResponse)
 async def list_query_sets(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
     company_profile_id: int | None = None,
@@ -1044,7 +781,7 @@ async def list_query_sets(
 @router.get("/queryset/{query_set_id}/detail", response_model=QuerySetDetailResponse)
 async def get_query_set_detail(
     query_set_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1126,7 +863,7 @@ async def get_query_set_detail(
 async def update_category(
     category_id: int,
     request: UpdateCategoryRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1169,7 +906,7 @@ async def update_category(
 @router.delete("/categories/{category_id}")
 async def delete_category(
     category_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1199,7 +936,7 @@ async def delete_category(
 async def create_category(
     query_set_id: int,
     request: CreateCategoryRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1268,7 +1005,7 @@ async def create_category(
 @router.get("/categories/{category_id}/queries", response_model=QueriesListResponse)
 async def get_category_queries(
     category_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1314,7 +1051,7 @@ async def get_category_queries(
 
 @router.get("/profiles/stats", response_model=ProfileStatsListResponse)
 async def get_profile_pipeline_stats(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1551,7 +1288,7 @@ async def get_profile_pipeline_stats(
 )
 async def create_schedule(
     request: CreateScheduleRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1628,7 +1365,7 @@ async def create_schedule(
 
 @router.get("/schedules", response_model=ScheduleListResponse)
 async def list_schedules(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
     query_set_id: int | None = None,
@@ -1701,7 +1438,7 @@ async def list_schedules(
 async def update_schedule(
     schedule_id: int,
     request: UpdateScheduleRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):
@@ -1763,7 +1500,7 @@ async def update_schedule(
 @router.delete("/schedules/{schedule_id}")
 async def delete_schedule(
     schedule_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_user)],
     response: Response,
 ):

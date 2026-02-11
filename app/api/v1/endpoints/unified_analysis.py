@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_active_user, get_db
+from app.api.deps import DbSession, get_current_active_user
 from app.core.config import settings
 from app.db.session import async_session_maker
 from app.models.company_profile import CompanyProfile
@@ -99,7 +99,7 @@ def _build_pipeline_services(
 @router.post("/start", response_model=StartAnalysisResponse)
 async def start_analysis(
     request: StartAnalysisRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Start a new unified analysis job.
@@ -198,7 +198,7 @@ async def start_analysis(
 
 @router.get("/jobs", response_model=AnalysisJobListResponse)
 async def list_analysis_jobs(
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
     mode: str | None = None,
     company_profile_id: int | None = None,
@@ -281,7 +281,7 @@ async def list_analysis_jobs(
 @router.get("/jobs/{job_id}", response_model=AnalysisJobResponse)
 async def get_analysis_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Get details of a specific analysis job."""
@@ -333,7 +333,7 @@ async def get_analysis_job(
 @router.delete("/jobs/{job_id}", response_model=DeleteAnalysisResponse)
 async def delete_analysis_job(
     job_id: int,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Cancel a running analysis job or delete a completed one."""
@@ -375,7 +375,7 @@ async def delete_analysis_job(
 async def update_query_text(
     query_id: int,
     request: UpdateQueryRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Update the text of an expanded query."""
@@ -412,7 +412,7 @@ async def update_query_text(
 async def rerun_query(
     query_id: int,
     request: RerunQueryRequest,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
     current_user: Annotated[User, Depends(get_current_active_user)],
 ):
     """Rerun a specific query against selected LLM providers.
