@@ -3,7 +3,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, HTTPException, Query, status
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.api.deps import (
     CurrentUser,
@@ -27,6 +27,7 @@ from app.schemas.gallery import (
     ResponseLabelCreate,
     ResponseLabelResponse,
 )
+from app.services.gallery import GalleryService
 
 router = APIRouter(
     prefix="/workspaces/{workspace_id}/gallery",
@@ -51,57 +52,15 @@ async def list_gallery_responses(
     has_flags: bool | None = None,
 ) -> list[GalleryRunResponseItem]:
     """List run responses in gallery view with filters."""
-    # Base query: RunResponse -> CampaignRun -> Campaign (workspace filter)
-    query = (
-        select(RunResponse)
-        .join(CampaignRun, RunResponse.campaign_run_id == CampaignRun.id)
-        .join(Campaign, CampaignRun.campaign_id == Campaign.id)
-        .where(Campaign.workspace_id == workspace_id)
+    return await GalleryService.list_gallery_responses_with_filters(
+        db=db,
+        workspace_id=workspace_id,
+        skip=pagination.skip,
+        limit=pagination.limit,
+        llm_provider=llm_provider,
+        campaign_id=campaign_id,
+        has_flags=has_flags,
     )
-
-    # Apply filters
-    if llm_provider is not None:
-        query = query.where(RunResponse.llm_provider == llm_provider)
-    if campaign_id is not None:
-        query = query.where(Campaign.id == campaign_id)
-
-    query = query.order_by(RunResponse.created_at.desc())
-    query = query.offset(pagination.skip).limit(pagination.limit)
-
-    result = await db.execute(query)
-    responses = result.scalars().all()
-
-    items = []
-    for resp in responses:
-        # Count labels
-        label_count_result = await db.execute(
-            select(func.count(ResponseLabel.id)).where(
-                ResponseLabel.run_response_id == resp.id,
-            )
-        )
-        label_count = label_count_result.scalar() or 0
-
-        # Check flags
-        flag_result = await db.execute(
-            select(func.count(ResponseLabel.id)).where(
-                ResponseLabel.run_response_id == resp.id,
-                ResponseLabel.label_type == "flag",
-                ResponseLabel.resolved_at.is_(None),
-            )
-        )
-        flag_count = flag_result.scalar() or 0
-
-        if has_flags is True and flag_count == 0:
-            continue
-        if has_flags is False and flag_count > 0:
-            continue
-
-        item = GalleryRunResponseItem.model_validate(resp)
-        item.label_count = label_count
-        item.has_flags = flag_count > 0
-        items.append(item)
-
-    return items
 
 
 @router.get("/responses/{response_id}", response_model=GalleryDetailResponse)
@@ -129,21 +88,10 @@ async def get_gallery_response_detail(
             detail="Response not found in this workspace",
         )
 
-    # Fetch labels
-    labels_result = await db.execute(
-        select(ResponseLabel)
-        .where(ResponseLabel.run_response_id == response_id)
-        .order_by(ResponseLabel.created_at.desc())
+    # Fetch labels and citations
+    labels, citations = await GalleryService.get_response_detail_with_relations(
+        db, response_id
     )
-    labels = labels_result.scalars().all()
-
-    # Fetch citations
-    citations_result = await db.execute(
-        select(RunCitation)
-        .where(RunCitation.run_response_id == response_id)
-        .order_by(RunCitation.position_in_response)
-    )
-    citations = citations_result.scalars().all()
 
     detail = GalleryDetailResponse.model_validate(response)
     detail.labels = [ResponseLabelResponse.model_validate(label) for label in labels]

@@ -1,12 +1,11 @@
 """Dashboard aggregate API endpoints."""
 
-from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import WorkspaceMemberDep, get_db
+from app.api.deps import DbSession, WorkspaceMemberDep
 from app.models.expanded_query import ExpandedQuery
 from app.models.pipeline_category import PipelineCategory
 from app.models.pipeline_job import PipelineJob
@@ -53,7 +52,7 @@ async def _verify_job_workspace(
 async def get_citation_share(
     job_id: int,
     member: WorkspaceMemberDep,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     """Get citation share aggregation for a pipeline job.
 
@@ -95,7 +94,7 @@ async def get_citation_share(
 async def get_citation_trend(
     job_id: int,
     member: WorkspaceMemberDep,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     """Get time-series citation trend for a pipeline job.
 
@@ -135,7 +134,7 @@ async def get_citation_trend(
 async def get_brand_ranking(
     job_id: int,
     member: WorkspaceMemberDep,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     """Get brand ranking list with citation metrics.
 
@@ -159,7 +158,7 @@ async def get_brand_ranking(
 async def get_geo_score_summary(
     job_id: int,
     member: WorkspaceMemberDep,
-    db: Annotated[AsyncSession, Depends(get_db)],
+    db: DbSession,
 ):
     """Get GEO 5-trigger summary for a pipeline job.
 
