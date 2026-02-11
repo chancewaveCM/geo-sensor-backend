@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     # LLM Settings
     DEFAULT_LLM_PROVIDER: str = "gemini"
+    DEFAULT_LLM_PROVIDERS: list[str] = ["openai", "gemini"]  # For scheduler/multi-provider runs
     GEMINI_MODEL: str = "gemini-2.5-flash"
     OPENAI_MODEL: str = "gpt-5-nano"
 

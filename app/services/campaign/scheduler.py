@@ -116,8 +116,7 @@ class CampaignScheduler:
 
                 if missed_campaigns:
                     logger.warning(
-                        "Detected %d campaigns with missed scheduled runs",
-                        len(missed_campaigns)
+                        "Detected %d campaigns with missed scheduled runs", len(missed_campaigns)
                     )
                     for campaign in missed_campaigns:
                         logger.warning(
@@ -196,14 +195,14 @@ class CampaignScheduler:
                 campaign.id,
             )
             # Still update next_run_at to avoid re-polling
-            campaign.schedule_next_run_at = now + timedelta(
-                hours=campaign.schedule_interval_hours
-            )
+            campaign.schedule_next_run_at = now + timedelta(hours=campaign.schedule_interval_hours)
             await db.commit()
             return
 
-        # Default LLM providers
-        default_providers = ["openai", "gemini"]
+        # Default LLM providers from settings
+        from app.core.config import settings
+
+        default_providers = settings.DEFAULT_LLM_PROVIDERS
 
         # Create the run
         campaign_run = CampaignRun(
@@ -219,9 +218,7 @@ class CampaignScheduler:
         db.add(campaign_run)
 
         # Update next scheduled run time
-        campaign.schedule_next_run_at = now + timedelta(
-            hours=campaign.schedule_interval_hours
-        )
+        campaign.schedule_next_run_at = now + timedelta(hours=campaign.schedule_interval_hours)
 
         await db.commit()
         self._total_runs_created += 1
