@@ -19,6 +19,7 @@ from app.api.v1.endpoints import (
     operations,
     pipeline,
     projects,
+    publishing,
     queries,
     unified_analysis,
     users,
@@ -50,6 +51,7 @@ api_router.include_router(content_optimizer.router)
 api_router.include_router(content_rewrite.router)
 api_router.include_router(notifications.router)
 api_router.include_router(oauth.router)
+api_router.include_router(publishing.router)
 
 
 @api_router.get("/")

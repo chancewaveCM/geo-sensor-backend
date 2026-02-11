@@ -54,6 +54,7 @@ from app.models.oauth_token import OAuthPlatform, OAuthToken
 from app.models.pipeline_category import PipelineCategory
 from app.models.pipeline_job import PipelineJob
 from app.models.project import Project
+from app.models.publication import Publication, PublishQueue
 from app.models.query import Query, QueryStatus
 from app.models.query_set import QuerySet
 from app.models.raw_llm_response import RawLLMResponse
@@ -140,4 +141,7 @@ __all__ = [
     # OAuth models
     "OAuthToken",
     "OAuthPlatform",
+    # Publication models
+    "Publication",
+    "PublishQueue",
 ]
