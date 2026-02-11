@@ -264,9 +264,9 @@ async def get_notification_logs(
 async def test_notification(
     workspace_id: int,
     campaign_id: int,
+    admin: WorkspaceAdminDep,
     notification_id: int = Query(..., description="Notification config ID to test"),
     test_request: NotificationTestRequest = NotificationTestRequest(),
-    admin: WorkspaceAdminDep = None,
     db: AsyncSession = Depends(get_async_session),
 ):
     """Test a notification configuration (admin only)."""
@@ -303,6 +303,13 @@ async def test_notification(
         )
     elif config.type == NotificationType.WEBHOOK.value:
         sender = WebhookSender()
+        # Validate webhook URL before sending
+        try:
+            sender._validate_webhook_url(config.destination)
+        except ValueError as e:
+            raise HTTPException(
+                status_code=400, detail=f"Invalid webhook URL: {e}"
+            )
         success, error_message = await sender.send_campaign_alert(
             webhook_url=config.destination,
             campaign_id=campaign_id,

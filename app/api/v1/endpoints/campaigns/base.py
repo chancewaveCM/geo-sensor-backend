@@ -82,6 +82,13 @@ async def list_campaigns(
     """List campaigns in workspace. Optional ?status_filter query param."""
     query = select(Campaign).where(Campaign.workspace_id == workspace_id)
     if status_filter is not None:
+        # Validate against CampaignStatus enum to prevent SQL injection
+        valid_statuses = [s.value for s in CampaignStatus]
+        if status_filter not in valid_statuses:
+            valid_list = ", ".join(valid_statuses)
+            raise ValidationError(
+                f"Invalid status filter: {status_filter}. Must be one of: {valid_list}"
+            )
         query = query.where(Campaign.status == status_filter)
     query = query.order_by(Campaign.created_at.desc())
 
@@ -200,11 +207,11 @@ async def create_campaign_run(
         raise ValidationError("Cannot run a campaign that is not active")
 
     try:
-        # Determine next run_number
+        # Determine next run_number with SELECT FOR UPDATE to prevent race conditions
         max_run = await db.execute(
-            select(func.max(CampaignRun.run_number)).where(
-                CampaignRun.campaign_id == campaign_id,
-            )
+            select(func.max(CampaignRun.run_number))
+            .where(CampaignRun.campaign_id == campaign_id)
+            .with_for_update()
         )
         current_max = max_run.scalar() or 0
         next_run_number = current_max + 1
@@ -374,8 +381,12 @@ async def list_campaign_companies(
     """List companies linked to the campaign. Requires membership."""
     await _get_campaign_or_404(db, workspace_id, campaign_id)
 
+    # Use JOIN to avoid N+1 query
+    from sqlalchemy.orm import selectinload
+
     result = await db.execute(
         select(CampaignCompany)
+        .options(selectinload(CampaignCompany.company_profile))
         .where(CampaignCompany.campaign_id == campaign_id)
         .order_by(CampaignCompany.display_order)
     )
@@ -383,16 +394,8 @@ async def list_campaign_companies(
 
     responses = []
     for link in links:
-        # Fetch company name
-        cp_result = await db.execute(
-            select(CompanyProfile).where(
-                CompanyProfile.id == link.company_profile_id,
-            )
-        )
-        cp = cp_result.scalar_one_or_none()
-
         resp = CampaignCompanyResponse.model_validate(link)
-        resp.company_name = cp.name if cp else None
+        resp.company_name = link.company_profile.name if link.company_profile else None
         responses.append(resp)
 
     return responses

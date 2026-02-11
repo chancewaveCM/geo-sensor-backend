@@ -79,6 +79,18 @@ async def run_pipeline_job(ctx: dict, job_id: int) -> None:
     except Exception as e:
         logger.exception(f"ARQ worker failed for job {job_id}: {e}")
 
+        # Rollback job status to FAILED
+        async with async_session_maker() as rollback_db:
+            try:
+                job = await rollback_db.get(PipelineJob, job_id)
+                if job:
+                    job.status = PipelineStatus.FAILED.value
+                    job.error_message = str(e)[:1000]
+                    job.completed_at = datetime.now(tz=UTC)
+                    await rollback_db.commit()
+            except Exception:
+                logger.exception(f"Failed to rollback job {job_id} status")
+
         # Record in dead letter queue
         async with async_session_maker() as db:
             dlq_entry = DeadLetterJob(

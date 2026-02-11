@@ -115,7 +115,7 @@ class TrendDetector:
         change_absolute = current - previous
 
         if previous != 0:
-            change_percent = (change_absolute / abs(previous)) * 100.0
+            change_percent = (change_absolute / previous) * 100.0
         elif current != 0:
             change_percent = 100.0 if current > 0 else -100.0
         else:

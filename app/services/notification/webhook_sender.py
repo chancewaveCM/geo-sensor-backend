@@ -22,6 +22,26 @@ class WebhookSender:
         if not self.secret_key:
             logger.warning("Webhook secret key not configured")
 
+    def _validate_webhook_url(self, url: str) -> None:
+        """Validate webhook URL to prevent SSRF attacks."""
+        from urllib.parse import urlparse
+        import ipaddress
+
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            raise ValueError("Webhook URL must use HTTP or HTTPS")
+
+        hostname = parsed.hostname or ""
+        if hostname in ("localhost", "127.0.0.1", "::1", "0.0.0.0"):
+            raise ValueError("Webhook URL cannot target localhost")
+
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                raise ValueError("Webhook URL cannot target private IP ranges")
+        except ValueError:
+            pass  # hostname is a domain name, OK
+
     def _generate_signature(self, payload: str) -> str:
         """Generate HMAC-SHA256 signature for payload."""
         if not self.secret_key:
@@ -50,6 +70,9 @@ class WebhookSender:
             Tuple of (success: bool, error_message: str | None)
         """
         try:
+            # Validate webhook URL to prevent SSRF
+            self._validate_webhook_url(webhook_url)
+
             payload_str = json.dumps(payload)
             signature = self._generate_signature(payload_str)
 
@@ -60,7 +83,9 @@ class WebhookSender:
                 "X-GEO-Timestamp": datetime.now(tz=UTC).isoformat(),
             }
 
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(timeout, connect=5.0, pool=2.0)
+            ) as client:
                 response = await client.post(
                     webhook_url,
                     content=payload_str,

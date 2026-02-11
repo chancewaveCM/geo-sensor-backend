@@ -25,7 +25,7 @@ class SimpleCache:
 
     def invalidate(self, pattern: str) -> int:
         """Invalidate all keys matching pattern prefix."""
-        keys = [k for k in self._store if k.startswith(pattern)]
+        keys = [k for k in self._store if k == pattern or k.startswith(pattern + ":")]
         for k in keys:
             del self._store[k]
         return len(keys)

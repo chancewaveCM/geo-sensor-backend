@@ -3,11 +3,12 @@
 import csv
 import io
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
 from app.api.deps import DbSession, WorkspaceMemberDep
+from app.core.exceptions import InternalError, NotFoundError
 from app.models.insight import Insight
 from app.schemas.campaign import (
     BrandRankingResponse,
@@ -204,10 +205,7 @@ async def get_brand_safety_metrics(
     try:
         return await CampaignAnalyticsService.get_brand_safety_metrics(db, campaign_id)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve brand safety metrics: {e!s}",
-        )
+        raise InternalError(f"Failed to retrieve brand safety metrics: {e!s}")
 
 
 # ---------------------------------------------------------------------------
@@ -281,10 +279,7 @@ async def dismiss_insight(
     )
     insight = result.scalar_one_or_none()
     if insight is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Insight not found",
-        )
+        raise NotFoundError("Insight", insight_id)
     insight.is_dismissed = True
     await db.commit()
     await db.refresh(insight)

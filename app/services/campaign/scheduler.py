@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import threading
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select
@@ -235,11 +236,14 @@ class CampaignScheduler:
 
 # Module-level singleton for easy access
 _scheduler: CampaignScheduler | None = None
+_scheduler_lock = threading.Lock()
 
 
 def get_scheduler(poll_interval_seconds: int = 60) -> CampaignScheduler:
-    """Get or create the campaign scheduler singleton."""
+    """Get or create the campaign scheduler singleton (thread-safe)."""
     global _scheduler
     if _scheduler is None:
-        _scheduler = CampaignScheduler(poll_interval_seconds=poll_interval_seconds)
+        with _scheduler_lock:
+            if _scheduler is None:
+                _scheduler = CampaignScheduler(poll_interval_seconds=poll_interval_seconds)
     return _scheduler
