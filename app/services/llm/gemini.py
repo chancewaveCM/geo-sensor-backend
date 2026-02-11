@@ -1,5 +1,5 @@
 """
-Gemini LLM Provider Implementation
+Gemini LLM Provider Implementation (google-genai SDK)
 """
 
 import logging
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class GeminiService(BaseLLMService):
-    """Google Gemini LLM provider"""
+    """Google Gemini LLM provider (google-genai SDK)"""
 
     provider = LLMProvider.GEMINI
 
@@ -31,13 +31,12 @@ class GeminiService(BaseLLMService):
         """Lazy initialization of Gemini client"""
         if self._client is None:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=self.api_key)
-                self._client = genai.GenerativeModel(self.model)
+                from google import genai
+                self._client = genai.Client(api_key=self.api_key)
             except ImportError:
                 raise ImportError(
-                    "google-generativeai package required. "
-                    "Install with: pip install google-generativeai"
+                    "google-genai package required. "
+                    "Install with: pip install google-genai"
                 )
         return self._client
 
@@ -48,33 +47,38 @@ class GeminiService(BaseLLMService):
         temperature: float = 0.7,
         max_tokens: int = DEFAULT_MAX_TOKENS,
     ) -> LLMResponse:
-        """Generate response using Gemini"""
+        """Generate response using Gemini (google-genai SDK)"""
         start_time = time.time()
 
         client = self._get_client()
 
-        full_prompt = prompt
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n{prompt}"
+        from google.genai import types
 
-        response = await client.generate_content_async(
-            full_prompt,
-            generation_config={
-                "temperature": temperature,
-                "max_output_tokens": max_tokens,
-            }
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        )
+        if system_prompt:
+            config.system_instruction = system_prompt
+
+        response = await client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+            config=config,
         )
 
         latency_ms = (time.time() - start_time) * 1000
+
+        # Extract token usage safely
+        tokens_used = 0
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            tokens_used = getattr(response.usage_metadata, 'total_token_count', 0) or 0
 
         return LLMResponse(
             content=response.text,
             provider=self.provider,
             model=self.model,
-            tokens_used=(
-                response.usage_metadata.total_token_count
-                if hasattr(response, 'usage_metadata') else 0
-            ),
+            tokens_used=tokens_used,
             latency_ms=latency_ms,
             raw_response=(
                 {

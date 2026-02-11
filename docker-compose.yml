@@ -1,17 +1,35 @@
 version: "3.8"
 
 services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: geo_user
+      POSTGRES_PASSWORD: geo_password
+      POSTGRES_DB: geo_sensor
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U geo_user -d geo_sensor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: .
     ports:
-      - "8000:8000"
+      - "8765:8765"
     environment:
-      - DATABASE_URL=sqlite+aiosqlite:///./geo_sensor.db
+      - DATABASE_URL=postgresql+asyncpg://geo_user:geo_password@db:5432/geo_sensor
       - SECRET_KEY=${SECRET_KEY:-dev-secret-key}
     volumes:
       - ./:/app
-      - sqlite_data:/app/data
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      db:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8765 --reload
 
 volumes:
-  sqlite_data:
+  postgres_data:

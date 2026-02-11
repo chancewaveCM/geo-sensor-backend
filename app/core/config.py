@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite+aiosqlite:///./geo_sensor.db"
 
+    # PostgreSQL connection pool settings (ignored for SQLite)
+    DB_POOL_SIZE: int = 5
+    DB_MAX_OVERFLOW: int = 10
+    DB_POOL_PRE_PING: bool = True
+
     # CORS - GEO Sensor uses port 3765 (frontend) / 8765 (backend)
     CORS_ORIGINS: list[str] = [
         "http://localhost:3765",  # GEO Sensor Frontend (primary)
