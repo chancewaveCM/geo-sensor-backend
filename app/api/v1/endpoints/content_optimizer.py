@@ -12,7 +12,6 @@ from urllib.parse import urljoin
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import DbSession, get_current_active_user
 from app.core.config import settings
