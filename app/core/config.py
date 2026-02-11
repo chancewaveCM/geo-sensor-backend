@@ -65,6 +65,17 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.5-flash"
     OPENAI_MODEL: str = "gpt-5-nano"
 
+    # OAuth Settings
+    OAUTH_ENCRYPTION_KEY: str = ""
+    YOUTUBE_CLIENT_ID: str = ""
+    YOUTUBE_CLIENT_SECRET: str = ""
+    INSTAGRAM_CLIENT_ID: str = ""
+    INSTAGRAM_CLIENT_SECRET: str = ""
+    LINKEDIN_CLIENT_ID: str = ""
+    LINKEDIN_CLIENT_SECRET: str = ""
+    TWITTER_CLIENT_ID: str = ""
+    TWITTER_CLIENT_SECRET: str = ""
+
     # Analysis Settings
     FUZZY_MATCH_THRESHOLD: float = 0.8
     SENTIMENT_CONFIDENCE_THRESHOLD: float = 0.7

@@ -13,6 +13,7 @@ from app.models.campaign import (
 )
 from app.models.citation import Citation, MatchType
 from app.models.company_profile import CompanyProfile
+from app.models.content_rewrite import ContentRewrite, RewriteVariant
 from app.models.dead_letter import DeadLetterJob
 from app.models.enums import (
     CampaignStatus,
@@ -49,6 +50,7 @@ from app.models.generated_query import (
 )
 from app.models.insight import Insight
 from app.models.notification import NotificationConfig, NotificationLog
+from app.models.oauth_token import OAuthPlatform, OAuthToken
 from app.models.pipeline_category import PipelineCategory
 from app.models.pipeline_job import PipelineJob
 from app.models.project import Project
@@ -65,6 +67,9 @@ __all__ = [
     "Base",
     "TimestampMixin",
     "User",
+    # Content Rewrite
+    "ContentRewrite",
+    "RewriteVariant",
     "Project",
     "Brand",
     "Query",
@@ -132,4 +137,7 @@ __all__ = [
     "NotificationStatus",
     "ThresholdType",
     "ComparisonOperator",
+    # OAuth models
+    "OAuthToken",
+    "OAuthPlatform",
 ]

@@ -9,11 +9,13 @@ from app.api.v1.endpoints import (
     company_profiles,
     comparisons,
     content_optimizer,
+    content_rewrite,
     dashboard,
     gallery,
     generated_queries,
     llm,
     notifications,
+    oauth,
     operations,
     pipeline,
     projects,
@@ -45,7 +47,9 @@ api_router.include_router(operations.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(unified_analysis.router)
 api_router.include_router(content_optimizer.router)
+api_router.include_router(content_rewrite.router)
 api_router.include_router(notifications.router)
+api_router.include_router(oauth.router)
 
 
 @api_router.get("/")

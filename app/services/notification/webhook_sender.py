@@ -24,8 +24,8 @@ class WebhookSender:
 
     def _validate_webhook_url(self, url: str) -> None:
         """Validate webhook URL to prevent SSRF attacks."""
-        from urllib.parse import urlparse
         import ipaddress
+        from urllib.parse import urlparse
 
         parsed = urlparse(url)
         if parsed.scheme not in ("http", "https"):
