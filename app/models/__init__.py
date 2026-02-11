@@ -1,3 +1,4 @@
+from app.models.annotation import CampaignAnnotation
 from app.models.base import Base, TimestampMixin
 from app.models.brand import Brand
 from app.models.campaign import (
@@ -114,4 +115,6 @@ __all__ = [
     "OperationStatus",
     # Insight
     "Insight",
+    # Annotation
+    "CampaignAnnotation",
 ]
