@@ -60,8 +60,8 @@ class InstagramPublisher(BasePlatformPublisher):
                     f"{self.API_BASE}/me",
                     params={
                         "fields": "id,username",
-                        "access_token": token,
                     },
+                    headers={"Authorization": f"Bearer {token}"},
                     timeout=30.0,
                 )
 
@@ -83,8 +83,8 @@ class InstagramPublisher(BasePlatformPublisher):
                     f"{self.API_BASE}/{ig_user_id}/media",
                     params={
                         "caption": formatted,
-                        "access_token": token,
                     },
+                    headers={"Authorization": f"Bearer {token}"},
                     timeout=30.0,
                 )
 
@@ -104,8 +104,8 @@ class InstagramPublisher(BasePlatformPublisher):
                     f"{self.API_BASE}/{ig_user_id}/media_publish",
                     params={
                         "creation_id": container_id,
-                        "access_token": token,
                     },
+                    headers={"Authorization": f"Bearer {token}"},
                     timeout=30.0,
                 )
 

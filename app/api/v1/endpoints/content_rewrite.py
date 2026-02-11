@@ -26,6 +26,9 @@ async def generate_rewrite(
     db: DbSession,
 ) -> RewriteResponse:
     """Generate AI-powered content rewrite variants."""
+    if member.workspace_id != workspace_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this workspace")
+
     try:
         rewrite = await ContentRewriter.generate_rewrites(
             original=request.original_content,
@@ -68,6 +71,9 @@ async def list_rewrites(
     limit: int = Query(20, ge=1, le=100),
 ) -> RewriteListResponse:
     """List content rewrites for a workspace."""
+    if member.workspace_id != workspace_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this workspace")
+
     rewrites, total = await ContentRewriter.get_rewrites(workspace_id, db, skip, limit)
     return RewriteListResponse(
         rewrites=[
@@ -103,6 +109,9 @@ async def get_rewrite(
     db: DbSession,
 ) -> RewriteResponse:
     """Get a specific content rewrite with variants."""
+    if member.workspace_id != workspace_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this workspace")
+
     rewrite = await ContentRewriter.get_rewrite(rewrite_id, db)
     if not rewrite or rewrite.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Rewrite not found")
@@ -137,12 +146,15 @@ async def update_variant_status(
     db: DbSession,
 ) -> RewriteVariantResponse:
     """Approve or reject a rewrite variant."""
+    if member.workspace_id != workspace_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this workspace")
+
     rewrite = await ContentRewriter.get_rewrite(rewrite_id, db)
     if not rewrite or rewrite.workspace_id != workspace_id:
         raise HTTPException(status_code=404, detail="Rewrite not found")
 
     try:
-        variant = await ContentRewriter.approve_variant(variant_id, request.status, db)
+        variant = await ContentRewriter.approve_variant(variant_id, rewrite_id, request.status, db)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

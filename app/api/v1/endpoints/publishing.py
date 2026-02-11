@@ -67,11 +67,6 @@ async def publish_content(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Publishing failed: {str(e)}",
-        )
 
 
 @router.get(
@@ -127,18 +122,12 @@ async def get_publication(
         )
 
     service = PublishingService()
-    publication = await service.get_publication(publication_id, db)
+    publication = await service.get_publication(publication_id, workspace_id, db)
 
     if not publication:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Publication not found",
-        )
-
-    if publication.workspace_id != workspace_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Publication does not belong to this workspace",
         )
 
     return publication
@@ -164,21 +153,15 @@ async def retry_publication(
     service = PublishingService()
 
     # Verify publication exists and belongs to workspace
-    publication = await service.get_publication(publication_id, db)
+    publication = await service.get_publication(publication_id, workspace_id, db)
     if not publication:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Publication not found",
         )
 
-    if publication.workspace_id != workspace_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Publication does not belong to this workspace",
-        )
-
     try:
-        publication = await service.retry_failed(publication_id, db)
+        publication = await service.retry_failed(publication_id, workspace_id, db)
         return publication
     except PublishError as e:
         raise HTTPException(

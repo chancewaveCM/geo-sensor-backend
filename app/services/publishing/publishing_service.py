@@ -170,27 +170,36 @@ class PublishingService:
 
         return publications, total
 
-    async def get_publication(self, publication_id: int, db: AsyncSession) -> Publication | None:
+    async def get_publication(
+        self, publication_id: int, workspace_id: int, db: AsyncSession
+    ) -> Publication | None:
         """
         Get a publication by ID.
 
         Args:
             publication_id: Publication ID
+            workspace_id: Workspace ID (for authorization)
             db: Database session
 
         Returns:
             Publication or None if not found
         """
-        stmt = select(Publication).where(Publication.id == publication_id)
+        stmt = select(Publication).where(
+            Publication.id == publication_id,
+            Publication.workspace_id == workspace_id,
+        )
         result = await db.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def retry_failed(self, publication_id: int, db: AsyncSession) -> Publication:
+    async def retry_failed(
+        self, publication_id: int, workspace_id: int, db: AsyncSession
+    ) -> Publication:
         """
         Retry a failed publication.
 
         Args:
             publication_id: Publication ID
+            workspace_id: Workspace ID (for authorization)
             db: Database session
 
         Returns:
@@ -200,7 +209,7 @@ class PublishingService:
             PublishError: If publication not found or not failed
         """
         # Get publication
-        publication = await self.get_publication(publication_id, db)
+        publication = await self.get_publication(publication_id, workspace_id, db)
         if not publication:
             raise PublishError("Publication not found")
 

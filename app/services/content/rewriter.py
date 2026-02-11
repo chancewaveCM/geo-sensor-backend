@@ -64,6 +64,7 @@ class ContentRewriter:
     @staticmethod
     async def approve_variant(
         variant_id: int,
+        rewrite_id: int,
         status: str,
         db: AsyncSession,
     ) -> RewriteVariant:
@@ -71,6 +72,10 @@ class ContentRewriter:
         variant = await db.get(RewriteVariant, variant_id)
         if not variant:
             raise ValueError(f"Variant {variant_id} not found")
+
+        # Verify variant belongs to the specified rewrite (IDOR protection)
+        if variant.rewrite_id != rewrite_id:
+            raise ValueError(f"Variant {variant_id} not found for this rewrite")
 
         variant.status = status
         if status == "approved":
