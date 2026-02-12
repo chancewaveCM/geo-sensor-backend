@@ -647,11 +647,16 @@ def seed_demo():  # noqa: C901, PLR0912, PLR0915
             cc_count += 1
     print(f"  Created {cc_count} campaign-company mappings")
 
-    # Intent Clusters (3 per campaign)
+    # Intent Clusters (8 per campaign)
     cluster_defs = [
         ("브랜드 인지도", "AI 검색 브랜드 인지도 분석"),
         ("기능 비교", "AI 검색 서비스 기능 비교"),
         ("사용자 경험", "AI 검색 사용자 경험 평가"),
+        ("가격 및 요금제", "AI 검색 가격 정책 분석"),
+        ("기술 혁신", "AI 검색 기술 혁신 추세"),
+        ("시장 점유율", "AI 검색 시장 점유율 현황"),
+        ("고객 지원", "AI 검색 고객 지원 품질"),
+        ("데이터 보안", "AI 검색 데이터 보안 및 개인정보 보호"),
     ]
     all_cluster_ids: dict[int, list[int]] = {}
     for cid in campaign_ids:
@@ -664,7 +669,7 @@ def seed_demo():  # noqa: C901, PLR0912, PLR0915
             })
             clist.append(clid)
         all_cluster_ids[cid] = clist
-    print(f"  Created {len(campaign_ids) * 3} intent clusters")
+    print(f"  Created {len(campaign_ids) * 8} intent clusters")
 
     # Query Definitions (2 per cluster) + Versions
     query_texts_by_cluster = {
@@ -679,6 +684,26 @@ def seed_demo():  # noqa: C901, PLR0912, PLR0915
         "사용자 경험": [
             ("AI 검색 만족도가 가장 높은 서비스?", "anchor"),
             ("AI 검색 사용자 경험 평가", "exploration"),
+        ],
+        "가격 및 요금제": [
+            ("카카오 AI 검색 가격 정책은?", "anchor"),
+            ("AI 검색 서비스 요금제 비교", "exploration"),
+        ],
+        "기술 혁신": [
+            ("네이버 AI 검색 정확도는 어떤가요?", "anchor"),
+            ("AI 검색 기술 혁신 트렌드 분석", "exploration"),
+        ],
+        "시장 점유율": [
+            ("구글 vs 네이버 검색 품질 비교", "anchor"),
+            ("한국 AI 검색 시장 점유율 현황", "exploration"),
+        ],
+        "고객 지원": [
+            ("네이버 AI 검색 고객 지원 품질은?", "anchor"),
+            ("AI 검색 고객 서비스 만족도 비교", "exploration"),
+        ],
+        "데이터 보안": [
+            ("AI 검색 개인정보 보호 정책 비교", "anchor"),
+            ("네이버 AI 검색 데이터 보안 수준은?", "exploration"),
         ],
     }
 
@@ -1059,44 +1084,156 @@ def seed_demo():  # noqa: C901, PLR0912, PLR0915
         })
     print(f"  Created {len(snap_cfgs)} comparison snapshots")
 
-    # Operation Logs (10)
-    op_types = [
-        "promote_to_anchor", "parser_issue",
-        "archive", "export", "label_action",
-        "anchor_change_request",
+    # Operation Logs (10) - realistic operations
+    realistic_ops = [
+        {
+            "type": "campaign_status_change",
+            "target_type": "campaign",
+            "target_id": str(camp1),
+            "status": "approved",
+            "payload": {
+                "type": "campaign_status_change",
+                "action": "캠페인 상태 변경",
+                "detail": "Q1 AI 검색 브랜드 분석: active → paused",
+                "reason": "프롬프트 템플릿 업데이트를 위한 일시 중지",
+            },
+        },
+        {
+            "type": "prompt_update",
+            "target_type": "prompt_template",
+            "target_id": str(prompt_ids[0]),
+            "status": "approved",
+            "payload": {
+                "type": "prompt_update",
+                "action": "프롬프트 템플릿 수정",
+                "detail": "v1.0 → v2.0: 인용 정확도 개선을 위한 프롬프트 재설계",
+                "changed_by": "김지현",
+            },
+        },
+        {
+            "type": "query_add",
+            "target_type": "intent_cluster",
+            "target_id": str(all_cluster_ids[camp1][0]),
+            "status": "approved",
+            "payload": {
+                "type": "query_add",
+                "action": "쿼리 추가",
+                "detail": "인텐트 클러스터 '브랜드 인지도'에 신규 쿼리 3개 추가",
+                "queries": ["네이버 AI 검색 신뢰도", "구글 검색 vs 네이버 검색"],
+            },
+        },
+        {
+            "type": "brand_update",
+            "target_type": "brand",
+            "target_id": str(brand_bing),
+            "status": "approved",
+            "payload": {
+                "type": "brand_update",
+                "action": "경쟁사 브랜드 추가",
+                "detail": "빙(Bing)을 경쟁사 목록에 추가",
+                "brand": "빙",
+            },
+        },
+        {
+            "type": "run_trigger",
+            "target_type": "campaign_run",
+            "target_id": str(all_run_ids[4]) if len(all_run_ids) > 4 else "5",
+            "status": "approved",
+            "payload": {
+                "type": "run_trigger",
+                "action": "수동 실행 트리거",
+                "detail": "Run #5 수동 실행 - 프롬프트 변경 후 검증 목적",
+                "run_id": 5,
+            },
+        },
+        {
+            "type": "citation_review",
+            "target_type": "campaign_run",
+            "target_id": str(all_run_ids[3]) if len(all_run_ids) > 3 else "4",
+            "status": "pending",
+            "payload": {
+                "type": "citation_review",
+                "action": "인용 리뷰 일괄 처리",
+                "detail": "Run #4 응답 20개에 대한 인용 정확도 리뷰 완료",
+                "reviewed_count": 20,
+            },
+        },
+        {
+            "type": "export",
+            "target_type": "campaign",
+            "target_id": str(camp1),
+            "status": "pending",
+            "payload": {
+                "type": "export_request",
+                "action": "데이터 내보내기 요청",
+                "detail": "Q1 AI 검색 브랜드 분석 - 전체 인용 데이터 CSV 내보내기",
+                "format": "csv",
+            },
+        },
+        {
+            "type": "label_action",
+            "target_type": "response_label",
+            "target_id": None,
+            "status": "pending",
+            "payload": {
+                "type": "label_batch",
+                "action": "응답 라벨 일괄 적용",
+                "detail": "갤러리 응답 15개에 'high_quality' 라벨 적용",
+                "count": 15,
+            },
+        },
+        {
+            "type": "schedule_change",
+            "target_type": "campaign",
+            "target_id": str(camp1),
+            "status": "rejected",
+            "reject_reason": "주 3회 실행 시 데이터 갭 발생 우려",
+            "payload": {
+                "type": "schedule_change",
+                "action": "스케줄 설정 변경",
+                "detail": "일일 실행 → 주 3회(월/수/금) 실행으로 변경",
+                "old_schedule": "daily",
+                "new_schedule": "3x/week",
+            },
+        },
+        {
+            "type": "archive",
+            "target_type": "campaign",
+            "target_id": str(camp3),
+            "status": "rejected",
+            "reject_reason": "히스토리 데이터 보존 필요",
+            "payload": {
+                "type": "campaign_delete",
+                "action": "캠페인 삭제 요청",
+                "detail": "테스트 캠페인 삭제 요청 - 더 이상 사용하지 않음",
+                "campaign": "테스트 캠페인",
+            },
+        },
     ]
-    op_statuses = (
-        ["pending"] * 3 + ["approved"] * 5
-        + ["rejected"] * 2
-    )
-    random.shuffle(op_statuses)
-    for i, op_st in enumerate(op_statuses):
+
+    for i, op_def in enumerate(realistic_ops):
         reviewer = (
-            park_uid if op_st != "pending" else None
+            park_uid if op_def["status"] != "pending" else None
         )
         rev_at = (
             ts(-random.randint(1, 5))
             if reviewer else None
         )
         rev_comment = (
-            "승인합니다." if op_st == "approved"
+            "승인합니다." if op_def["status"] == "approved"
             else (
-                "반려합니다." if op_st == "rejected"
+                op_def.get("reject_reason")
+                if op_def["status"] == "rejected"
                 else None
             )
         )
         _insert(cur, "operation_logs", {
             "workspace_id": ws_id,
-            "operation_type": op_types[i % len(op_types)],
-            "status": op_st,
-            "target_type": "query_definition",
-            "target_id": (
-                str(all_qd_ids[i % len(all_qd_ids)])
-                if all_qd_ids else None
-            ),
-            "payload": json.dumps({
-                "reason": f"데모 작업 #{i+1}",
-            }),
+            "operation_type": op_def["type"],
+            "status": op_def["status"],
+            "target_type": op_def["target_type"],
+            "target_id": op_def["target_id"],
+            "payload": json.dumps(op_def["payload"]),
             "created_by": random.choice(
                 [demo_uid, park_uid, lee_uid],
             ),
@@ -1106,7 +1243,7 @@ def seed_demo():  # noqa: C901, PLR0912, PLR0915
             "created_at": ts(-random.randint(1, 15)),
             "updated_at": ts(-1),
         })
-    print(f"  Created {len(op_statuses)} operation logs")
+    print(f"  Created {len(realistic_ops)} operation logs")
 
     # Campaign Annotations (5)
     annot_data = [
