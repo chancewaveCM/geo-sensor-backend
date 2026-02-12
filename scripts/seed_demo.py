@@ -18,14 +18,21 @@ import json
 import random
 import sqlite3
 import sys
+import warnings
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from passlib.context import CryptContext
+
+warnings.filterwarnings("ignore")
+
 DB_PATH = Path(__file__).resolve().parent.parent / "geo_sensor.db"
 DEMO_EMAIL = "demo@geosensor.ai"
-PASSWORD_HASH = (
-    "$2b$12$Vt/3Bz7PW0IhXJ/lDn7sceyM91xfnV4PhKk.EIeRotmv7V2yCv0Li"
-)
+DEMO_PASSWORD = "Demo1234!"
+
+# Generate hash dynamically to avoid stale hardcoded hash issues
+_pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
+PASSWORD_HASH = _pwd_ctx.hash(DEMO_PASSWORD)
 
 NOW = datetime.now(UTC)
 random.seed(42)
@@ -273,8 +280,8 @@ BRAND_WEIGHTS = {
 BRAND_LIST = list(BRAND_WEIGHTS.keys())
 BRAND_CUMULATIVE: list[tuple[str, float]] = []
 _cum = 0.0
-for _b, _w in BRAND_WEIGHTS.items():
-    _cum += _w
+for _b, _wt in BRAND_WEIGHTS.items():
+    _cum += _wt
     BRAND_CUMULATIVE.append((_b, _cum))
 
 
