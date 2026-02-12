@@ -73,6 +73,25 @@ async def login(
             detail="Inactive user"
         )
 
+    # Auto-create workspace for users who don't have one (legacy accounts)
+    membership_check = await db.execute(
+        select(WorkspaceMember.id).where(WorkspaceMember.user_id == user.id).limit(1)
+    )
+    if membership_check.scalar_one_or_none() is None:
+        ws_name = f"{user.full_name or user.email.split('@')[0]}'s Workspace"
+        base_slug = _generate_workspace_slug(ws_name)
+        unique_slug = await _ensure_unique_workspace_slug(db, base_slug)
+        workspace = Workspace(name=ws_name, slug=unique_slug)
+        db.add(workspace)
+        await db.flush()
+        member = WorkspaceMember(
+            workspace_id=workspace.id,
+            user_id=user.id,
+            role=WorkspaceRole.ADMIN.value,
+        )
+        db.add(member)
+        await db.commit()
+
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=user.id, expires_delta=access_token_expires
